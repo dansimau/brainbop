@@ -98,6 +98,7 @@ kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius
 .dots .side{aspect-ratio:1;background:var(--panel2);border-radius:var(--r);border:2px solid transparent;padding:0;overflow:hidden}
 .dots .side:hover{border-color:var(--accent)}
 .dots svg{width:100%;height:100%;display:block}
+.dots .side{position:relative}.dots .side.hid svg{visibility:hidden}.dots .side.hid::after{content:'?';position:absolute;inset:0;display:grid;place-items:center;font-size:48px;font-weight:800;color:var(--muted)}
 .pop{animation:pop .2s}
 @keyframes pop{from{transform:scale(.7);opacity:.3}to{transform:scale(1);opacity:1}}
 .seqline{font-size:34px;font-weight:800;text-align:center;margin:30px 0;letter-spacing:1px;font-variant-numeric:tabular-nums}
@@ -545,15 +546,15 @@ start(api){
 }});
 
 /* --- Quick Count (dot estimation) --- */
-reg({id:'dots',name:'Quick Count',icon:'⚫',cat:'Speed',desc:'Two clouds of dots. Which side has more? Trust your gut, 45 seconds.',how:'Use ← → keys or tap a side. Differences shrink as difficulty rises.',
+reg({id:'dots',name:'Quick Count',icon:'⚫',cat:'Speed',desc:'Two clouds of dots. Which side has more? Trust your gut, 45 seconds.',how:'Use ← → keys or tap a side. Differences shrink as difficulty rises, and from difficulty 5 the dots flash briefly, so answer from memory.',
 start(api){
-  const d=api.diff;let correct=0,wrong=0,more=0;const ratio=Math.max(1.08,1.6-d*.055);
+  const d=api.diff;let correct=0,wrong=0,more=0,round=0;const ratio=Math.max(1.08,1.6-d*.055);
   api.el.innerHTML=`<div class="dots"><button class="side" data-s="0"></button><button class="side" data-s="1"></button></div><div class="center" id="fb"></div>`;
   const sides=$$('.side',api.el),fb=$('#fb',api.el);
   function svg(n){let s='<svg viewBox="0 0 100 100">';for(let i=0;i<n;i++)s+=`<circle cx="${(5+Math.random()*90).toFixed(1)}" cy="${(5+Math.random()*90).toFixed(1)}" r="${d>=7?2.2:2.8}" fill="#e9ecf8"/>`;return s+'</svg>'}
   function next(){const base=rndInt(8,10+d*3);const other=Math.max(base+1,Math.round(base*ratio));more=rndInt(0,1);
-    sides[more].innerHTML=svg(other);sides[1-more].innerHTML=svg(base);sides.forEach(s=>s.style.visibility='visible');
-    if(d>=5)api.setTimeout(()=>sides.forEach(s=>s.style.visibility='hidden'),Math.max(500,1500-d*80))}
+    sides[more].innerHTML=svg(other);sides[1-more].innerHTML=svg(base);sides.forEach(s=>s.classList.remove('hid'));
+    const r=++round;if(d>=5)api.setTimeout(()=>{if(r===round)sides.forEach(s=>s.classList.add('hid'))},Math.max(500,1500-d*80))}
   function answer(s){if(s===more){correct++;flashFb(fb,'✓','good')}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
   sides.forEach(s=>s.onclick=()=>answer(+s.dataset.s));
   api.onKey(e=>{if(e.key==='ArrowLeft')answer(0);if(e.key==='ArrowRight')answer(1)});

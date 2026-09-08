@@ -30,7 +30,7 @@ h3{margin:0 0 6px;font-size:16px}
 .panel{background:var(--panel);border-radius:var(--r);padding:16px}
 .games{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 .gcard{background:var(--panel);border-radius:var(--r);padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;transition:transform .15s,background .15s;border:1px solid transparent}
-.gcard:hover{transform:translateY(-2px);background:var(--panel2);border-color:var(--line)}
+@media(hover:hover){.gcard:hover{transform:translateY(-2px);background:var(--panel2);border-color:var(--line)}}
 .gcard .ico{font-size:28px}
 .gcard .nm{font-weight:700;font-size:16px}
 .gcard .ds{font-size:13px;color:var(--muted);line-height:1.35;flex:1}
@@ -70,7 +70,7 @@ h3{margin:0 0 6px;font-size:16px}
 .answer:focus{border-color:var(--accent)}
 .choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;max-width:580px;margin:0 auto}
 .choice{background:var(--panel2);padding:16px;border-radius:12px;font-weight:700;font-size:17px;border:2px solid transparent}
-.choice:hover{border-color:var(--accent)}
+@media(hover:hover){.choice:hover{border-color:var(--accent)}}
 kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius:5px;color:var(--muted);margin-right:4px;vertical-align:middle}
 #fb{min-height:28px;font-weight:700;font-size:18px;margin-top:8px}
 .grid{display:grid;gap:8px;max-width:520px;margin:0 auto}
@@ -96,7 +96,7 @@ kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius
 .schulte button.shake{background:var(--bad)}
 .dots{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:640px;margin:0 auto}
 .dots .side{aspect-ratio:1;background:var(--panel2);border-radius:var(--r);border:2px solid transparent;padding:0;overflow:hidden}
-.dots .side:hover{border-color:var(--accent)}
+@media(hover:hover){.dots .side:hover{border-color:var(--accent)}}
 .dots svg{width:100%;height:100%;display:block}
 .dots .side{position:relative}.dots .side.hid svg{visibility:hidden}.dots .side.hid::after{content:'?';position:absolute;inset:0;display:grid;place-items:center;font-size:48px;font-weight:800;color:var(--muted)}
 .pop{animation:pop .2s}
@@ -507,7 +507,7 @@ start(api){
     modeEl.textContent=mode==='COLOR'?'Tap the INK COLOR':'Tap what the WORD SAYS';modeEl.className='center '+(mode==='COLOR'?'muted':'warn');
     word.textContent=pal[w].n;word.style.color=pal[c].c}
   function answer(i){const t=mode==='COLOR'?cur.c:cur.w;if(i===t){correct++;flashFb(fb,'✓','good')}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
-  $$('.choice',api.el).forEach(b=>b.onclick=()=>answer(+b.dataset.i));
+  $$('.choice',api.el).forEach(b=>b.onclick=()=>{b.blur();answer(+b.dataset.i)});
   api.onKey(e=>{const n=parseInt(e.key);if(n>=1&&n<=k)answer(n-1)});
   api.countdown(45,()=>api.finish(clamp(correct*30-wrong*30,0,2000),[`${correct} correct`,`${wrong} wrong`,`${Math.round(100*correct/Math.max(1,correct+wrong))}% accuracy`]));
   api.hud('✓ 0  ✗ 0');next();
@@ -556,7 +556,7 @@ start(api){
     sides[more].innerHTML=svg(other);sides[1-more].innerHTML=svg(base);sides.forEach(s=>s.classList.remove('hid'));
     const r=++round;if(d>=5)api.setTimeout(()=>{if(r===round)sides.forEach(s=>s.classList.add('hid'))},Math.max(500,1500-d*80))}
   function answer(s){if(s===more){correct++;flashFb(fb,'✓','good')}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
-  sides.forEach(s=>s.onclick=()=>answer(+s.dataset.s));
+  sides.forEach(s=>s.onclick=()=>{s.blur();answer(+s.dataset.s)});
   api.onKey(e=>{if(e.key==='ArrowLeft')answer(0);if(e.key==='ArrowRight')answer(1)});
   api.countdown(45,()=>api.finish(clamp(correct*45-wrong*45,0,2000),[`${correct} correct`,`${wrong} wrong`]));
   api.hud('✓ 0  ✗ 0');next();
@@ -684,7 +684,7 @@ start(api){
   function next(){const base=shape();isMirror=Math.random()<.5;let other=isMirror?mirror(base):base;other=rot(other,rndInt(1,3));
     pair.innerHTML=`<div class="side" style="cursor:default">${svg(base)}</div><div class="side" style="cursor:default">${svg(other)}</div>`}
   function answer(a){if((a===1)===isMirror){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
-  $$('.choice',api.el).forEach(b=>b.onclick=()=>answer(+b.dataset.a));
+  $$('.choice',api.el).forEach(b=>b.onclick=()=>{b.blur();answer(+b.dataset.a)});
   api.onKey(e=>{if(e.key==='ArrowLeft')answer(0);if(e.key==='ArrowRight')answer(1)});
   api.countdown(45,()=>api.finish(clamp(correct*60-wrong*60,0,2000),[`${correct} correct`,`${wrong} wrong`]));
   api.hud('✓ 0  ✗ 0');next();

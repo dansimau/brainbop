@@ -435,21 +435,25 @@ start(api){
 }});
 
 /* --- Grid Recall --- */
-reg({id:'grid',name:'Grid Recall',icon:'🟦',cat:'Memory',desc:'Memorize the highlighted cells, then tap them back from memory. Two lives.',how:'Score 100 per cell in your longest pattern.',
+reg({id:'grid',name:'Grid Recall',icon:'🟦',cat:'Memory',desc:'Memorize the highlighted cells, then tap them back from memory. Two lives.',how:'Score 100 per cell in your longest pattern. The grid grows so the pattern never fills more than half of it.',
 start(api){
-  const d=api.diff;const n=Math.min(7,4+Math.floor((d-1)/3));
-  let count=3+Math.floor((d-1)/2),best=0,lives=2,pattern,picked,phase='wait';
-  api.el.innerHTML=`<div class="center muted" id="gr-msg" style="min-height:22px"></div><div class="sgrid" id="gr" style="grid-template-columns:repeat(${n},1fr)">${Array.from({length:n*n},(_,i)=>`<button class="scell" data-i="${i}"></button>`).join('')}</div>`;
-  const cells=$$('.scell',api.el),msg=$('#gr-msg',api.el);
-  const hud=()=>api.hud(`Cells ${count} · Lives ${'❤️'.repeat(lives)||'—'}`);
-  function show(){phase='show';picked=new Set();pattern=new Set(shuffle([...Array(n*n).keys()]).slice(0,count));
+  const d=api.diff;let n=Math.min(7,4+Math.floor((d-1)/3)),cells=[];
+  let count=3+Math.floor((d-1)/2),best=0,lives=2,pattern,picked,phase='wait';const MAXN=10;
+  api.el.innerHTML=`<div class="center muted" id="gr-msg" style="min-height:22px"></div><div class="sgrid" id="gr"></div>`;
+  const grid=$('#gr',api.el),msg=$('#gr-msg',api.el);
+  const hud=()=>api.hud(`Cells ${count} · ${n}×${n} · Lives ${'❤️'.repeat(Math.max(0,lives))||'—'}`);
+  const half=()=>Math.floor(n*n/2);
+  function build(){grid.style.gridTemplateColumns=`repeat(${n},1fr)`;grid.innerHTML=Array.from({length:n*n},(_,i)=>`<button class="scell" data-i="${i}"></button>`).join('');
+    cells=$$('.scell',grid);cells.forEach(c=>c.onclick=()=>tap(c))}
+  function show(){while(count>half()&&n<MAXN)n++;if(count>half()){finish();return}if(cells.length!==n*n)build();
+    phase='show';picked=new Set();pattern=new Set(shuffle([...Array(n*n).keys()]).slice(0,count));
     cells.forEach((c,i)=>c.className='scell'+(pattern.has(i)?' lit':''));msg.textContent=`Memorize ${count} cells`;hud();
     api.setTimeout(()=>{cells.forEach(c=>c.className='scell');phase='input';msg.textContent='Now tap them'},800+count*220)}
   function finish(){api.finish(best*100,[`${best} cells`,`${n}×${n} grid`])}
-  cells.forEach(c=>c.onclick=()=>{if(phase!=='input')return;const i=+c.dataset.i;if(picked.has(i))return;picked.add(i);
+  function tap(c){if(phase!=='input')return;const i=+c.dataset.i;if(picked.has(i))return;picked.add(i);
     if(pattern.has(i)){c.classList.add('ok');if(picked.size===count){best=Math.max(best,count);count++;phase='wait';msg.textContent='✓ Correct';sfx.ok();api.setTimeout(show,700)}}
     else{c.classList.add('bad');phase='wait';sfx.bad();cells.forEach((cc,k)=>{if(pattern.has(k)&&!picked.has(k))cc.classList.add('lit')});lives--;hud();
-      if(lives<0){msg.textContent='Out of lives';api.setTimeout(finish,1200)}else{msg.textContent='✗ Try that size again';api.setTimeout(show,1300)}}});
+      if(lives<0){msg.textContent='Out of lives';api.setTimeout(finish,1200)}else{msg.textContent='✗ Try that size again';api.setTimeout(show,1300)}}}
   api.setTimeout(show,500);
 }});
 

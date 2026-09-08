@@ -68,6 +68,7 @@ h3{margin:0 0 6px;font-size:16px}
 .prompt.huge{font-size:96px;line-height:1;margin:40px 0;transition:opacity .2s}
 .answer{display:block;margin:0 auto 10px;width:240px;font-size:32px;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--text);outline:none}
 .answer:focus{border-color:var(--accent)}
+.answer-row{display:flex;justify-content:center;align-items:stretch;gap:8px;margin:0 auto 10px;max-width:100%}.answer-row .answer{margin:0;min-width:0;flex:0 1 240px}.answer-row .btn{flex:none;font-size:18px;padding:0 20px}
 .choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;max-width:580px;margin:0 auto}
 .choice{background:var(--panel2);padding:16px;border-radius:12px;font-weight:700;font-size:17px;border:2px solid transparent}
 @media(hover:hover){.choice:hover{border-color:var(--accent)}}
@@ -462,15 +463,15 @@ start(api){
 reg({id:'digits',name:'Digit Span',icon:'🔢',cat:'Memory',desc:'A number flashes briefly. Type it back from memory. Each round adds a digit.',how:'At difficulty 6+ you must type it backwards.',
 start(api){
   const d=api.diff;let len=3+Math.floor(d/2),best=0,lives=1,num='';const reverse=d>=6;
-  api.el.innerHTML=`<div class="center muted" id="ds-msg" style="min-height:22px"></div><div class="prompt huge" id="ds-num" style="font-size:64px;letter-spacing:6px"></div><input id="ds-in" class="answer" inputmode="numeric" autocomplete="off" hidden>`;
-  const msg=$('#ds-msg',api.el),disp=$('#ds-num',api.el),inp=$('#ds-in',api.el);
+  api.el.innerHTML=`<div class="center muted" id="ds-msg" style="min-height:22px"></div><div class="prompt huge" id="ds-num" style="font-size:64px;letter-spacing:6px"></div><form id="ds-f" class="answer-row" hidden><input id="ds-in" class="answer" inputmode="numeric" enterkeyhint="go" autocomplete="off"><button class="btn" type="submit">Go</button></form>`;
+  const msg=$('#ds-msg',api.el),disp=$('#ds-num',api.el),frm=$('#ds-f',api.el),inp=$('#ds-in',api.el);$('button',frm).onpointerdown=e=>e.preventDefault();
   const hud=()=>api.hud(`Digits ${len} · Lives ${lives+1}${reverse?' · REVERSE':''}`);
-  function show(){num=String(rndInt(1,9))+Array.from({length:len-1},()=>rndInt(0,9)).join('');inp.hidden=true;inp.value='';disp.textContent=num;msg.textContent='Memorize…';hud();
-    api.setTimeout(()=>{disp.textContent='';inp.hidden=false;inp.focus();msg.textContent=reverse?'Type it BACKWARDS':'Type it back'},500+len*380)}
-  inp.addEventListener('keydown',e=>{if(e.key!=='Enter'||!inp.value)return;const target=reverse?[...num].reverse().join(''):num;
-    if(inp.value.trim()===target){best=Math.max(best,len);len++;msg.textContent='✓';sfx.ok();inp.hidden=true;api.setTimeout(show,600)}
-    else{lives--;sfx.bad();inp.hidden=true;disp.textContent=num;msg.textContent=`✗ It was ${num}`;
-      if(lives<0)api.setTimeout(()=>api.finish(Math.round(best*100*(reverse?1.2:1)),[`${best} digits`,reverse?'reverse':'forward'],{len:best}),1400);else api.setTimeout(show,1400)}});
+  function show(){num=String(rndInt(1,9))+Array.from({length:len-1},()=>rndInt(0,9)).join('');frm.hidden=true;inp.value='';disp.textContent=num;msg.textContent='Memorize…';hud();
+    api.setTimeout(()=>{disp.textContent='';frm.hidden=false;inp.focus();msg.textContent=reverse?'Type it BACKWARDS':'Type it back'},500+len*380)}
+  frm.onsubmit=e=>{e.preventDefault();if(!inp.value)return;const target=reverse?[...num].reverse().join(''):num;
+    if(inp.value.trim()===target){best=Math.max(best,len);len++;msg.textContent='✓';sfx.ok();frm.hidden=true;api.setTimeout(show,600)}
+    else{lives--;sfx.bad();frm.hidden=true;disp.textContent=num;msg.textContent=`✗ It was ${num}`;
+      if(lives<0)api.setTimeout(()=>api.finish(Math.round(best*100*(reverse?1.2:1)),[`${best} digits`,reverse?'reverse':'forward'],{len:best}),1400);else api.setTimeout(show,1400)}};
   api.setTimeout(show,400);
 }});
 
@@ -563,11 +564,11 @@ start(api){
 }});
 
 /* --- Math Sprint --- */
-reg({id:'math',name:'Math Sprint',icon:'➕',cat:'Math',desc:'Solve as many arithmetic problems as you can in 60 seconds.',how:'Type the answer and press Enter. Operators and sizes grow with difficulty.',
+reg({id:'math',name:'Math Sprint',icon:'➕',cat:'Math',desc:'Solve as many arithmetic problems as you can in 60 seconds.',how:'Type the answer and hit Go. Operators and sizes grow with difficulty.',
 start(api){
   const d=api.diff;let correct=0,wrong=0,cur;
-  api.el.innerHTML=`<div class="prompt" id="q"></div><input id="ans" class="answer" inputmode="numeric" autocomplete="off" placeholder="?"><div class="center muted small">Enter to submit</div><div class="center" id="fb"></div>`;
-  const q=$('#q',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);
+  api.el.innerHTML=`<div class="prompt" id="q"></div><form id="af" class="answer-row"><input id="ans" class="answer" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="?"><button class="btn" type="submit">Go</button></form><div class="center" id="fb"></div>`;
+  const q=$('#q',api.el),frm=$('#af',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);$('button',frm).onpointerdown=e=>e.preventDefault();
   function gen(){const ops=d<=2?['+','-']:d<=4?['+','-','×']:['+','-','×','÷'];const op=pick(ops);const max=d<=2?20:d<=4?60:d<=6?100:250;let a,b,ans;
     if(op==='+'){a=rndInt(2,max);b=rndInt(2,max);ans=a+b}
     else if(op==='-'){a=rndInt(2,max);b=rndInt(1,a);ans=a-b}
@@ -576,9 +577,9 @@ start(api){
     if(d>=7&&Math.random()<0.35){const c=rndInt(2,19);return{text:`${a} ${op} ${b} + ${c}`,ans:ans+c}}
     return{text:`${a} ${op} ${b}`,ans}}
   function next(){cur=gen();q.textContent=cur.text+' = ?';inp.value='';inp.focus()}
-  inp.addEventListener('keydown',e=>{if(e.key!=='Enter'||inp.value.trim()==='')return;
+  frm.onsubmit=e=>{e.preventDefault();if(inp.value.trim()==='')return;
     if(parseInt(inp.value,10)===cur.ans){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,`✗ ${cur.ans}`,'bad');sfx.bad()}
-    api.hud(`✓ ${correct}  ✗ ${wrong}`);next()});
+    api.hud(`✓ ${correct}  ✗ ${wrong}`);next()};
   api.countdown(60,()=>api.finish(clamp(correct*40-wrong*15,0,2000),[`${correct} correct`,`${wrong} wrong`]));
   api.hud('✓ 0  ✗ 0');next();
 }});
@@ -596,11 +597,11 @@ const anagrams=w=>(ANAG[w]||'').split(' ').filter(Boolean);
 reg({id:'scramble',name:'Word Scramble',icon:'🔤',cat:'Language',desc:'Unscramble as many words as you can in 60 seconds.',how:'Longer words at higher difficulty. Any valid anagram counts. Skipping costs a little.',
 start(api){
   const d=api.diff;let solved=0,skipped=0,cur,scr,used=new Set();
-  api.el.innerHTML=`<div class="prompt big" id="sw" style="letter-spacing:6px"></div><input id="ans" class="answer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word" style="width:300px;font-size:26px"><div class="center" style="margin-top:8px"><button class="btn sec" id="skip">Skip</button></div><div class="center" id="fb"></div>`;
-  const sw=$('#sw',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);
+  api.el.innerHTML=`<div class="prompt big" id="sw" style="letter-spacing:6px"></div><form id="af" class="answer-row"><input id="ans" class="answer" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="go" spellcheck="false" placeholder="word" style="font-size:26px"><button class="btn" type="submit">Go</button></form><div class="center" style="margin-top:8px"><button class="btn sec" id="skip">Skip</button></div><div class="center" id="fb"></div>`;
+  const sw=$('#sw',api.el),frm=$('#af',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);$('button',frm).onpointerdown=e=>e.preventDefault();
   function len(){if(d>=9)return rndInt(5,8);return Math.min(8,4+Math.floor((d-1)/2))}
   function next(){let w;do{w=pick(WORDS[len()])}while(used.has(w));used.add(w);const alts=anagrams(w);let s;do{s=shuffle([...w]).join('')}while(s===w||alts.includes(s));cur=w;scr=s;sw.textContent=s.toUpperCase();inp.value='';inp.focus()}
-  inp.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=inp.value.trim().toLowerCase();if(a===scr){flashFb(fb,'✗ that is the scramble itself','bad');inp.select()}else if(a===cur||anagrams(cur).includes(a)){solved++;flashFb(fb,'✓ '+a+(a===cur?'':` (also ${cur})`),'good');sfx.ok();api.hud(`Solved ${solved} · Skipped ${skipped}`);next()}else{flashFb(fb,'✗ try again','bad');inp.select()}});
+  frm.onsubmit=e=>{e.preventDefault();const a=inp.value.trim().toLowerCase();if(!a)return;if(a===scr){flashFb(fb,'✗ that is the scramble itself','bad');inp.select()}else if(a===cur||anagrams(cur).includes(a)){solved++;flashFb(fb,'✓ '+a+(a===cur?'':` (also ${cur})`),'good');sfx.ok();api.hud(`Solved ${solved} · Skipped ${skipped}`);next()}else{flashFb(fb,'✗ try again','bad');inp.select()}};
   $('#skip',api.el).onclick=()=>{skipped++;flashFb(fb,'skipped','warn');api.hud(`Solved ${solved} · Skipped ${skipped}`);next()};
   api.countdown(60,()=>api.finish(clamp(solved*130-skipped*20,0,2000),[`${solved} solved`,`${skipped} skipped`]));
   api.hud('Solved 0 · Skipped 0');next();

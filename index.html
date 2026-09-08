@@ -601,7 +601,7 @@ start(api){
   function len(){if(d>=9)return rndInt(5,8);return Math.min(8,4+Math.floor((d-1)/2))}
   function next(){let w;do{w=pick(WORDS[len()])}while(used.has(w));used.add(w);const alts=anagrams(w);let s;do{s=shuffle([...w]).join('')}while(s===w||alts.includes(s));cur=w;scr=s;sw.textContent=s.toUpperCase();inp.value='';inp.focus()}
   inp.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=inp.value.trim().toLowerCase();if(a===scr){flashFb(fb,'✗ that is the scramble itself','bad');inp.select()}else if(a===cur||anagrams(cur).includes(a)){solved++;flashFb(fb,'✓ '+a+(a===cur?'':` (also ${cur})`),'good');sfx.ok();api.hud(`Solved ${solved} · Skipped ${skipped}`);next()}else{flashFb(fb,'✗ try again','bad');inp.select()}});
-  $('#skip',api.el).onclick=()=>{skipped++;flashFb(fb,`skipped: ${cur}`,'warn');api.hud(`Solved ${solved} · Skipped ${skipped}`);next()};
+  $('#skip',api.el).onclick=()=>{skipped++;flashFb(fb,'skipped','warn');api.hud(`Solved ${solved} · Skipped ${skipped}`);next()};
   api.countdown(60,()=>api.finish(clamp(solved*130-skipped*20,0,2000),[`${solved} solved`,`${skipped} skipped`]));
   api.hud('Solved 0 · Skipped 0');next();
 }});

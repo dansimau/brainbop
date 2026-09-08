@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BrainBop · Brain Training</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🧠</text></svg>">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0e1120;--panel:#171b2e;--panel2:#1f2440;--line:#2a3155;--text:#e9ecf8;--muted:#8f97bb;--accent:#6c8cff;--pink:#ff7ab6;--good:#3ddc97;--bad:#ff5c7a;--warn:#ffc857;--r:14px}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+input{font:inherit}
+.app{max-width:960px;margin:0 auto;padding:16px 16px 90px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.logo{font-size:26px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:8px}
+.logo span{background:linear-gradient(90deg,var(--accent),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lvl{flex:1;min-width:200px;background:var(--panel);border-radius:var(--r);padding:8px 12px}
+.lvl .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px}
+.lvl .row b{color:var(--text)}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--pink));border-radius:6px;transition:width .5s}
+.chip{background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px}
+nav{position:fixed;bottom:0;left:0;right:0;background:rgba(14,17,32,.92);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;justify-content:center;gap:6px;padding:8px;z-index:5}
+nav button{padding:10px 22px;border-radius:12px;color:var(--muted);font-weight:600}
+nav button.active{background:var(--panel2);color:var(--text)}
+.screen{display:none}.screen.active{display:block}
+h2{font-size:13px;margin:24px 0 10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+h3{margin:0 0 6px;font-size:16px}
+.panel{background:var(--panel);border-radius:var(--r);padding:16px}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.gcard{background:var(--panel);border-radius:var(--r);padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;transition:transform .15s,background .15s;border:1px solid transparent}
+.gcard:hover{transform:translateY(-2px);background:var(--panel2);border-color:var(--line)}
+.gcard .ico{font-size:28px}
+.gcard .nm{font-weight:700;font-size:16px}
+.gcard .ds{font-size:13px;color:var(--muted);line-height:1.35;flex:1}
+.gcard .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+.gcard .meta b{color:var(--text)}
+.top{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.top{grid-template-columns:1fr}}
+.dlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.dlist button{display:flex;align-items:center;gap:10px;background:var(--panel2);border-radius:10px;padding:10px 12px;text-align:left}
+.dlist button.done{opacity:.55}
+.dlist button.done .n{text-decoration:line-through}
+.dlist .tick{margin-left:auto;font-weight:700;color:var(--good)}
+.bs{font-size:48px;font-weight:800;line-height:1}
+.cats{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.cat{display:grid;grid-template-columns:86px 1fr 40px;gap:10px;align-items:center;font-size:13px}
+.cat .bar i{background:var(--accent)}
+.cat .v{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}.center{text-align:center}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.small{font-size:13px}
+.btn{background:var(--accent);color:#fff;padding:12px 22px;border-radius:12px;font-weight:700;font-size:15px}
+.btn.sec{background:var(--panel2);color:var(--text)}
+.btn:active{transform:scale(.97)}
+/* play */
+.playbar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.playbar .ttl{font-weight:700;font-size:18px;flex:1}
+.hud{display:flex;justify-content:space-between;font-weight:600;margin-bottom:12px;font-size:15px;min-height:22px}
+.hud .timer{font-variant-numeric:tabular-nums;color:var(--warn)}
+#arena{min-height:400px;position:relative}
+.overlay{position:absolute;inset:0;background:var(--panel);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;z-index:2}
+.overlay .ico{font-size:56px}
+.overlay p{max-width:440px;color:var(--muted);line-height:1.5;margin:0}
+.dbadge{font-size:12px;background:var(--panel2);padding:4px 10px;border-radius:999px;color:var(--muted)}
+.prompt{font-size:40px;font-weight:800;text-align:center;margin:26px 0;font-variant-numeric:tabular-nums}
+.prompt.big{font-size:56px}
+.prompt.huge{font-size:96px;line-height:1;margin:40px 0;transition:opacity .2s}
+.answer{display:block;margin:0 auto 10px;width:240px;font-size:32px;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--text);outline:none}
+.answer:focus{border-color:var(--accent)}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;max-width:580px;margin:0 auto}
+.choice{background:var(--panel2);padding:16px;border-radius:12px;font-weight:700;font-size:17px;border:2px solid transparent}
+.choice:hover{border-color:var(--accent)}
+kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius:5px;color:var(--muted);margin-right:4px;vertical-align:middle}
+#fb{min-height:28px;font-weight:700;font-size:18px;margin-top:8px}
+.grid{display:grid;gap:8px;max-width:520px;margin:0 auto}
+.card-tile{aspect-ratio:1;background:var(--panel2);border-radius:10px;font-size:clamp(20px,4vw,34px);transition:transform .2s,background .2s}
+.card-tile .face{visibility:hidden}
+.card-tile.open{background:var(--accent)}
+.card-tile.open .face{visibility:visible}
+.card-tile.done{background:#1e4d3c}
+.card-tile.done .face{visibility:visible}
+.simon{display:grid;gap:10px;max-width:360px;margin:0 auto}
+.simon-tile{aspect-ratio:1;border-radius:14px;background:var(--c);opacity:.32;transition:opacity .1s,transform .1s}
+.simon-tile.lit{opacity:1;transform:scale(1.05);box-shadow:0 0 24px var(--c)}
+.simon-tile.hint{opacity:1;outline:3px solid #fff}
+.big-btn{display:block;margin:10px auto;font-size:20px;padding:18px 40px}
+.reflex{height:320px;border-radius:var(--r);background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;cursor:pointer;user-select:none;transition:background .08s}
+.reflex.wait{background:#7a2a3b}.reflex.go{background:#1f9d6a}.reflex.decoy{background:#a5842a}
+.sgrid{display:grid;gap:8px;max-width:420px;margin:12px auto}
+.scell{aspect-ratio:1;border-radius:10px;background:var(--panel2);transition:background .15s}
+.scell.lit{background:var(--accent)}.scell.ok{background:var(--good)}.scell.bad{background:var(--bad)}
+.schulte{display:grid;gap:6px;max-width:460px;margin:0 auto}
+.schulte button{aspect-ratio:1;background:var(--panel2);border-radius:8px;font-weight:700;font-size:clamp(14px,3vw,22px)}
+.schulte button.done{opacity:.12}
+.schulte button.shake{background:var(--bad)}
+.dots{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:640px;margin:0 auto}
+.dots .side{aspect-ratio:1;background:var(--panel2);border-radius:var(--r);border:2px solid transparent;padding:0;overflow:hidden}
+.dots .side:hover{border-color:var(--accent)}
+.dots svg{width:100%;height:100%;display:block}
+.pop{animation:pop .2s}
+@keyframes pop{from{transform:scale(.7);opacity:.3}to{transform:scale(1);opacity:1}}
+.seqline{font-size:34px;font-weight:800;text-align:center;margin:30px 0;letter-spacing:1px;font-variant-numeric:tabular-nums}
+.seqline .q{color:var(--pink)}
+/* result */
+.result{text-align:center;padding:30px 16px}
+.score{font-size:76px;font-weight:900;line-height:1;background:linear-gradient(90deg,var(--accent),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.tag{background:var(--panel2);padding:6px 12px;border-radius:999px;font-size:13px}
+.tag.hi{background:var(--good);color:#062;font-weight:700}
+.tag.xp{background:var(--accent);color:#fff;font-weight:700}
+.unlock{background:linear-gradient(90deg,#3b2f6b,#5a2d5a);border-radius:12px;padding:10px 14px;margin:8px auto;max-width:420px;display:flex;gap:10px;align-items:center;text-align:left}
+.unlock .ico{font-size:28px}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+/* stats */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--panel2);border-radius:12px;padding:12px}
+.kpi b{display:block;font-size:26px}
+.kpi span{font-size:12px;color:var(--muted)}
+.stat-row{display:grid;grid-template-columns:36px 1fr 120px 64px 56px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.stat-row:last-child{border:0}
+.stat-row svg{width:120px;height:32px}
+.stat-row .r{text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:560px){.stat-row{grid-template-columns:32px 1fr 64px 50px}.stat-row svg{display:none}}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.badge{background:var(--panel);border-radius:var(--r);padding:14px;text-align:center}
+.badge .ico{font-size:34px}
+.badge.locked{opacity:.4;filter:grayscale(1)}
+.badge .nm{font-weight:700;font-size:14px;margin-top:6px}
+.badge .ds{font-size:12px;color:var(--muted);margin-top:4px}
+.toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;z-index:9;animation:fade 3s forwards}
+@keyframes fade{0%,75%{opacity:1}100%{opacity:0}}
+.danger{color:var(--bad);text-decoration:underline;font-size:13px}
+.heat{display:grid;grid-template-columns:repeat(auto-fill,14px);gap:3px;margin-top:8px}
+.heat i{width:14px;height:14px;border-radius:3px;background:var(--line);display:block}
+.heat i.l1{background:#2f4a8a}.heat i.l2{background:#4a6cd0}.heat i.l3{background:var(--accent)}.heat i.l4{background:var(--pink)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">🧠 <span>BrainBop</span></div>
+    <div class="lvl">
+      <div class="row"><b id="lvl-label">Level 1</b><span id="lvl-xp">0 / 100 XP</span></div>
+      <div class="bar"><i id="lvl-bar" style="width:0%"></i></div>
+    </div>
+    <div class="chip" id="streak-chip" title="Daily streak">🔥 0</div>
+    <button class="chip" id="sound-btn" title="Toggle sound">🔊</button>
+  </header>
+
+  <section id="home" class="screen active"></section>
+  <section id="play" class="screen">
+    <div class="playbar">
+      <button class="btn sec" id="quit-btn">← Quit</button>
+      <div class="ttl" id="play-title"></div>
+      <span class="dbadge" id="play-diff"></span>
+    </div>
+    <div class="hud"><span id="hud-l"></span><span class="timer" id="hud-r"></span></div>
+    <div id="arena"></div>
+  </section>
+  <section id="result" class="screen"></section>
+  <section id="stats" class="screen"></section>
+  <section id="badges" class="screen"></section>
+</div>
+<nav>
+  <button data-nav="home" class="active">🏋️ Train</button>
+  <button data-nav="stats">📊 Stats</button>
+  <button data-nav="badges">🏅 Badges</button>
+</nav>
+
+<script>
+/* ================= utilities ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const rndInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today=()=>dateStr(new Date());
+const yesterday=()=>{const d=new Date();d.setDate(d.getDate()-1);return dateStr(d)};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function seeded(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19}return()=>{h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);return((h^=h>>>16)>>>0)/4294967296}}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000)}
+function flashFb(el,text,cls){el.textContent=text;el.className=cls;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop')}
+
+/* ================= sound ================= */
+let AC=null;
+function beep(f=440,ms=150,type='sine'){
+  if(!S.sound)return;
+  try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.value=.08;
+    o.connect(g);g.connect(AC.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+ms/1000);o.stop(AC.currentTime+ms/1000+.02)}catch(e){}
+}
+const sfx={ok:()=>beep(660,90),bad:()=>beep(160,180,'square'),win:()=>{beep(523,120);setTimeout(()=>beep(659,120),120);setTimeout(()=>beep(784,200),240)}};
+
+/* ================= state ================= */
+const KEY='brainbop_v1';
+const defaultState=()=>({xp:0,games:{},history:[],streak:{count:0,last:null},ach:[],daily:{date:null,done:[]},dailyCount:0,totalPlays:0,sound:true,days:{}});
+let S=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));return s?Object.assign(defaultState(),s):defaultState()}catch(e){return defaultState()}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function gs(id){return S.games[id]||(S.games[id]={best:0,plays:0,total:0,diff:1,hist:[]})}
+function levelInfo(xp){let l=1,need=100,rem=xp;while(rem>=need){rem-=need;l++;need=Math.round(need*1.2)}return{level:l,into:rem,need}}
+
+/* ================= game registry ================= */
+const GAMES=[];const G={};
+const CATS=['Memory','Attention','Speed','Math','Language','Logic'];
+function reg(g){GAMES.push(g);G[g.id]=g}
+
+/* ================= achievements ================= */
+const ACH=[
+  {id:'first',ico:'🌱',nm:'First Rep',ds:'Play your first game',t:s=>s.totalPlays>=1},
+  {id:'p10',ico:'🏃',nm:'Warming Up',ds:'Play 10 games',t:s=>s.totalPlays>=10},
+  {id:'p50',ico:'💪',nm:'Regular',ds:'Play 50 games',t:s=>s.totalPlays>=50},
+  {id:'p200',ico:'🏋️',nm:'Gym Rat',ds:'Play 200 games',t:s=>s.totalPlays>=200},
+  {id:'all',ico:'🗺️',nm:'Explorer',ds:'Play every game at least once',t:s=>GAMES.every(g=>(s.games[g.id]||{}).plays>0)},
+  {id:'l5',ico:'⭐',nm:'Level 5',ds:'Reach level 5',t:s=>levelInfo(s.xp).level>=5},
+  {id:'l10',ico:'🌟',nm:'Level 10',ds:'Reach level 10',t:s=>levelInfo(s.xp).level>=10},
+  {id:'l25',ico:'👑',nm:'Level 25',ds:'Reach level 25',t:s=>levelInfo(s.xp).level>=25},
+  {id:'s3',ico:'🔥',nm:'On a Roll',ds:'Train 3 days in a row',t:s=>s.streak.count>=3},
+  {id:'s7',ico:'🔥🔥',nm:'Week Warrior',ds:'Train 7 days in a row',t:s=>s.streak.count>=7},
+  {id:'s30',ico:'🌋',nm:'Unstoppable',ds:'Train 30 days in a row',t:s=>s.streak.count>=30},
+  {id:'d1',ico:'📅',nm:'Daily Dose',ds:'Complete a daily workout',t:s=>s.dailyCount>=1},
+  {id:'d10',ico:'🗓️',nm:'Habit Formed',ds:'Complete 10 daily workouts',t:s=>s.dailyCount>=10},
+  {id:'sc900',ico:'🎯',nm:'Sharpshooter',ds:'Score 900+ in any game',t:s=>Object.values(s.games).some(g=>g.best>=900)},
+  {id:'sc900x5',ico:'🏆',nm:'All-Rounder',ds:'Score 900+ in five different games',t:s=>Object.values(s.games).filter(g=>g.best>=900).length>=5},
+  {id:'diff5',ico:'📈',nm:'Climbing',ds:'Reach difficulty 5 in any game',t:s=>Object.values(s.games).some(g=>g.diff>=5)},
+  {id:'diff10',ico:'🏔️',nm:'Summit',ds:'Reach difficulty 10 in any game',t:s=>Object.values(s.games).some(g=>g.diff>=10)},
+  {id:'nbperf',ico:'🧠',nm:'Flawless Recall',ds:'Perfect N-Back run',t:(s,c)=>c&&c.id==='nback'&&c.extra&&c.extra.perfect},
+  {id:'fast',ico:'⚡',nm:'Lightning',ds:'Average reaction under 220 ms',t:(s,c)=>c&&c.id==='react'&&c.extra&&c.extra.avg<220},
+  {id:'span9',ico:'🔢',nm:'Nine Digits',ds:'Recall a 9-digit number',t:(s,c)=>c&&c.id==='digits'&&c.extra&&c.extra.len>=9},
+  {id:'xp5k',ico:'💎',nm:'Dedicated',ds:'Earn 5,000 XP',t:s=>s.xp>=5000},
+  {id:'xp25k',ico:'💠',nm:'Obsessed',ds:'Earn 25,000 XP',t:s=>s.xp>=25000},
+];
+function checkAch(ctx){const out=[];for(const a of ACH){if(S.ach.includes(a.id))continue;try{if(a.t(S,ctx)){S.ach.push(a.id);out.push(a)}}catch(e){}}return out}
+
+/* ================= daily workout ================= */
+function dailyGames(){const r=seeded('daily'+today());const ids=GAMES.map(g=>g.id);const out=[];while(out.length<3){const id=ids[Math.floor(r()*ids.length)];if(!out.includes(id))out.push(id)}return out}
+function dailyState(){if(S.daily.date!==today()){S.daily={date:today(),done:[]};save()}return S.daily}
+
+/* ================= brain score ================= */
+function recentAvg(id,n=5){const g=S.games[id];if(!g||!g.hist.length)return null;const h=g.hist.slice(-n);return h.reduce((a,b)=>a+Math.min(1000,b),0)/h.length}
+function catScores(){const out={};for(const c of CATS){const vals=GAMES.filter(g=>g.cat===c).map(g=>recentAvg(g.id)).filter(v=>v!=null);out[c]=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null}return out}
+function brainScore(){const cs=Object.values(catScores()).filter(v=>v!=null);return cs.length?Math.round(cs.reduce((a,b)=>a+b,0)/cs.length):null}
+
+/* ================= screens ================= */
+function showScreen(id){$$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));$$('nav button').forEach(b=>b.classList.toggle('active',b.dataset.nav===id));window.scrollTo(0,0)}
+$$('nav button').forEach(b=>b.onclick=()=>{if(current)abortGame();const id=b.dataset.nav;if(id==='home')renderHome();if(id==='stats')renderStats();if(id==='badges')renderBadges();showScreen(id)});
+$('#sound-btn').onclick=()=>{S.sound=!S.sound;save();renderHeader();if(S.sound)beep(660,80)};
+
+function renderHeader(){
+  const li=levelInfo(S.xp);
+  $('#lvl-label').textContent=`Level ${li.level}`;
+  $('#lvl-xp').textContent=`${li.into} / ${li.need} XP · ${S.xp} total`;
+  $('#lvl-bar').style.width=(100*li.into/li.need)+'%';
+  const active=S.streak.last===today()||S.streak.last===yesterday();
+  $('#streak-chip').textContent=`🔥 ${active?S.streak.count:0}`;
+  $('#streak-chip').title=active?`${S.streak.count}-day streak`:'Play today to start a streak';
+  $('#sound-btn').textContent=S.sound?'🔊':'🔇';
+}
+
+function renderHome(){
+  renderHeader();
+  const d=dailyState();const ids=dailyGames();const allDone=ids.every(i=>d.done.includes(i));
+  const bs=brainScore();const cs=catScores();
+  let html=`<div class="top">
+    <div class="panel"><h3>📅 Daily Workout</h3>
+      <div class="small muted">${allDone?'Complete! Come back tomorrow.':'Finish all three for +150 XP and to keep your streak alive.'}</div>
+      <div class="dlist">${ids.map(id=>{const g=G[id];const done=d.done.includes(id);return`<button data-play="${id}" class="${done?'done':''}"><span>${g.icon}</span><span class="n">${g.name}</span><span class="muted small">${g.cat}</span>${done?'<span class="tick">✓</span>':''}</button>`}).join('')}</div>
+    </div>
+    <div class="panel"><h3>🧠 Brain Score</h3>
+      <div class="bs">${bs==null?'—':bs}</div>
+      <div class="small muted">${bs==null?'Play a few games to get a score.':'Average of your recent form across categories (0–1000).'}</div>
+      <div class="cats">${CATS.map(c=>`<div class="cat"><span>${c}</span><div class="bar"><i style="width:${(cs[c]||0)/10}%"></i></div><span class="v muted">${cs[c]==null?'—':cs[c]}</span></div>`).join('')}</div>
+    </div></div>`;
+  for(const c of CATS){
+    const gl=GAMES.filter(g=>g.cat===c);if(!gl.length)continue;
+    html+=`<h2>${c}</h2><div class="games">${gl.map(g=>{const s=S.games[g.id];return`<button class="gcard" data-play="${g.id}"><div class="ico">${g.icon}</div><div class="nm">${g.name}</div><div class="ds">${g.desc}</div><div class="meta"><span>Best <b>${s&&s.plays?s.best:'—'}</b></span><span>Lvl <b>${s?s.diff:1}</b> · ${s?s.plays:0} plays</span></div></button>`}).join('')}</div>`;
+  }
+  $('#home').innerHTML=html;
+  $$('[data-play]',$('#home')).forEach(b=>b.onclick=()=>startGame(b.dataset.play));
+}
+
+function spark(hist){
+  if(!hist||hist.length<2)return'<span class="muted small">—</span>';
+  const h=hist.slice(-15);const max=Math.max(1000,...h);const w=120,ht=32;
+  const pts=h.map((v,i)=>`${(i/(h.length-1))*w},${ht-2-(v/max)*(ht-4)}`).join(' ');
+  return`<svg viewBox="0 0 ${w} ${ht}"><polyline fill="none" stroke="#6c8cff" stroke-width="2" points="${pts}"/></svg>`;
+}
+function renderStats(){
+  renderHeader();
+  const li=levelInfo(S.xp);const bs=brainScore();
+  const played=Object.values(S.games).filter(g=>g.plays);
+  const avg=played.length?Math.round(played.reduce((a,g)=>a+g.total,0)/played.reduce((a,g)=>a+g.plays,0)):0;
+  // heatmap of last 12 weeks
+  const cells=[];for(let i=83;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=dateStr(d);const n=S.days[k]||0;cells.push(`<i class="${n?n>=6?'l4':n>=4?'l3':n>=2?'l2':'l1':''}" title="${k}: ${n} game${n===1?'':'s'}"></i>`)}
+  let html=`<div class="panel"><h3>Overview</h3><div class="kpis">
+    <div class="kpi"><b>${li.level}</b><span>Level</span></div>
+    <div class="kpi"><b>${S.xp}</b><span>Total XP</span></div>
+    <div class="kpi"><b>${bs==null?'—':bs}</b><span>Brain score</span></div>
+    <div class="kpi"><b>${S.totalPlays}</b><span>Games played</span></div>
+    <div class="kpi"><b>${avg}</b><span>Average score</span></div>
+    <div class="kpi"><b>${Object.keys(S.days).length}</b><span>Days trained</span></div>
+    <div class="kpi"><b>${S.dailyCount}</b><span>Daily workouts</span></div>
+    <div class="kpi"><b>${S.ach.length}/${ACH.length}</b><span>Badges</span></div>
+  </div>
+  <h3 style="margin-top:18px">Activity · last 12 weeks</h3><div class="heat">${cells.join('')}</div></div>
+  <h2>Per game</h2><div class="panel">
+  <div class="stat-row muted small"><span></span><span>Game</span><span>Recent scores</span><span class="r">Best</span><span class="r">Lvl</span></div>
+  ${GAMES.map(g=>{const s=S.games[g.id];return`<div class="stat-row"><span style="font-size:22px">${g.icon}</span><span><b>${g.name}</b><br><span class="muted small">${g.cat} · ${s?s.plays:0} plays · avg ${s&&s.plays?Math.round(s.total/s.plays):'—'}</span></span>${spark(s&&s.hist)}<span class="r"><b>${s&&s.plays?s.best:'—'}</b></span><span class="r muted">${s?s.diff:1}</span></div>`}).join('')}
+  </div>
+  <div class="center" style="margin-top:24px"><button class="danger" id="reset-btn">Reset all progress</button></div>`;
+  $('#stats').innerHTML=html;
+  $('#reset-btn').onclick=()=>{if(confirm('Erase all progress, scores and badges? This cannot be undone.')){S=defaultState();save();renderStats();renderHeader();toast('Progress reset')}};
+}
+function renderBadges(){
+  renderHeader();
+  $('#badges').innerHTML=`<div class="panel small muted">${S.ach.length} of ${ACH.length} badges earned</div><div class="badges" style="margin-top:12px">${ACH.map(a=>`<div class="badge ${S.ach.includes(a.id)?'':'locked'}"><div class="ico">${a.ico}</div><div class="nm">${a.nm}</div><div class="ds">${a.ds}</div></div>`).join('')}</div>`;
+}
+
+/* ================= game runner ================= */
+let current=null;
+const arena=$('#arena');
+function startGame(id){
+  if(current)abortGame();
+  const g=G[id];const st=gs(id);
+  current={id,timers:[],key:null,done:false,started:false};
+  $('#play-title').textContent=`${g.icon} ${g.name}`;
+  $('#play-diff').textContent=`Difficulty ${st.diff}/10`;
+  $('#hud-l').textContent='';$('#hud-r').textContent='';
+  arena.innerHTML=`<div class="overlay"><div class="ico">${g.icon}</div><h3 style="font-size:24px">${g.name}</h3><p>${g.desc}</p>${g.how?`<p class="small">${g.how}</p>`:''}<p class="small">Best: <b>${st.plays?st.best:'—'}</b> · Difficulty ${st.diff}/10</p><button class="btn" id="go-btn">Start</button></div>`;
+  showScreen('play');
+  const go=()=>{if(!current||current.id!==id||current.started)return;current.started=true;current.key=null;arena.innerHTML='';g.start(makeApi(id,st.diff))};
+  $('#go-btn').onclick=go;$('#go-btn').focus();
+  current.key=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};
+}
+function makeApi(id,diff){
+  const api={
+    diff,el:arena,
+    setTimeout(fn,ms){const t=setTimeout(()=>{if(current&&current.id===id&&!current.done)fn()},ms);current.timers.push(t);return t},
+    setInterval(fn,ms){const t=setInterval(()=>{if(current&&current.id===id&&!current.done)fn()},ms);current.timers.push(t);return t},
+    onKey(fn){current.key=fn},
+    hud(t){$('#hud-l').textContent=t},
+    countdown(secs,onDone){const end=Date.now()+secs*1000;const tick=()=>{const left=Math.max(0,end-Date.now());$('#hud-r').textContent=`⏱ ${(left/1000).toFixed(left<10000?1:0)}s`;if(left<=0){clearInterval(t);onDone()}};const t=api.setInterval(tick,100);tick()},
+    stopwatch(){const t0=Date.now();api.setInterval(()=>{$('#hud-r').textContent=`⏱ ${((Date.now()-t0)/1000).toFixed(1)}s`},100);return()=>(Date.now()-t0)/1000},
+    finish(score,details,extra){endGame(id,Math.round(score),details||[],extra||{})}
+  };
+  return api;
+}
+function clearCurrent(){if(!current)return;current.done=true;current.timers.forEach(t=>{clearTimeout(t);clearInterval(t)});current=null}
+function abortGame(){clearCurrent();arena.innerHTML=''}
+$('#quit-btn').onclick=()=>{abortGame();renderHome();showScreen('home')};
+document.addEventListener('keydown',e=>{if(current&&current.key&&!current.done)current.key(e)});
+
+function endGame(id,score,details,extra){
+  if(!current||current.id!==id||current.done)return;
+  clearCurrent();
+  const g=G[id];const st=gs(id);const t=today();
+  const firstPlay=st.plays===0;const isBest=!firstPlay&&score>st.best;
+  const diffBefore=st.diff;
+  st.plays++;st.total+=score;st.best=Math.max(st.best,score);st.hist.push(score);if(st.hist.length>40)st.hist.shift();
+  if(score>=750)st.diff=Math.min(10,st.diff+1);else if(score<350)st.diff=Math.max(1,st.diff-1);
+  let xp=Math.round(score/10*(1+0.15*(diffBefore-1)));
+  if(isBest)xp+=25;if(firstPlay)xp+=20;
+  const lvlBefore=levelInfo(S.xp).level;
+  S.xp+=xp;S.totalPlays++;
+  S.days[t]=(S.days[t]||0)+1;
+  if(S.streak.last!==t){S.streak.count=S.streak.last===yesterday()?S.streak.count+1:1;S.streak.last=t}
+  const d=dailyState();let dailyComplete=false;const ids=dailyGames();
+  if(ids.includes(id)&&!d.done.includes(id)){d.done.push(id);if(ids.every(i=>d.done.includes(i))){dailyComplete=true;S.xp+=150;xp+=150;S.dailyCount++}}
+  S.history.push({d:t,g:id,s:score});if(S.history.length>500)S.history.shift();
+  const unlocked=checkAch({id,score,extra});
+  const lvlAfter=levelInfo(S.xp).level;
+  save();renderHeader();
+  if(score>=750)sfx.win();
+  const nextDaily=ids.find(i=>!d.done.includes(i));
+  $('#result').innerHTML=`<div class="result panel">
+    <div class="muted">${g.icon} ${g.name}</div>
+    <div class="score">${score}</div>
+    <div class="tags">${isBest?'<span class="tag hi">🏅 New best!</span>':`<span class="tag">Best ${st.best}</span>`}<span class="tag xp">+${xp} XP</span>${details.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>
+    <div class="small muted">${st.diff>diffBefore?`📈 Difficulty raised to ${st.diff}`:st.diff<diffBefore?`📉 Difficulty eased to ${st.diff}`:`Difficulty stays at ${st.diff}. Score 750+ to level up.`}</div>
+    ${lvlAfter>lvlBefore?`<div class="unlock"><span class="ico">🎉</span><div><b>Level up!</b><br><span class="small">You reached level ${lvlAfter}</span></div></div>`:''}
+    ${dailyComplete?`<div class="unlock"><span class="ico">📅</span><div><b>Daily workout complete!</b><br><span class="small">+150 bonus XP · streak ${S.streak.count}</span></div></div>`:''}
+    ${unlocked.map(a=>`<div class="unlock"><span class="ico">${a.ico}</span><div><b>Badge unlocked: ${a.nm}</b><br><span class="small">${a.ds}</span></div></div>`).join('')}
+    <div class="actions"><button class="btn" id="again-btn">Play again</button>${nextDaily&&nextDaily!==id?`<button class="btn sec" id="next-btn">Next daily: ${G[nextDaily].icon} ${G[nextDaily].name}</button>`:''}<button class="btn sec" id="home-btn">Home</button></div>
+  </div>`;
+  showScreen('result');
+  $('#again-btn').onclick=()=>startGame(id);
+  $('#home-btn').onclick=()=>{renderHome();showScreen('home')};
+  if($('#next-btn'))$('#next-btn').onclick=()=>startGame(nextDaily);
+}
+
+/* ================= GAMES ================= */
+
+/* --- Memory Match --- */
+reg({id:'match',name:'Memory Match',icon:'🃏',cat:'Memory',desc:'Flip cards and find every matching pair in as few moves as possible.',how:'Higher difficulty adds more pairs.',
+start(api){
+  const pairs=Math.min(18,6+(api.diff-1)*2);
+  const EMO=['🍎','🍌','🍇','🍓','🍒','🥝','🍍','🥑','🌽','🥕','🍄','🌶️','🧀','🍕','🍔','🌮','🍩','🍪','🎈','🎲','🎸','🚀','🌈','⚽','🐶','🐱','🦊','🐸','🐙','🦋','🌵','🍀'];
+  const cards=shuffle([...shuffle(EMO).slice(0,pairs),...shuffle(EMO).slice(0,0)].flatMap(e=>[e,e]));
+  const cols=pairs<=8?4:pairs<=12?6:6;
+  let first=null,lock=false,moves=0,found=0;const t0=Date.now();
+  api.el.innerHTML=`<div class="grid" style="grid-template-columns:repeat(${cols},1fr)">${cards.map((c,i)=>`<button class="card-tile" data-i="${i}"><span class="face">${c}</span></button>`).join('')}</div>`;
+  api.stopwatch();
+  const upd=()=>api.hud(`Moves ${moves} · Pairs ${found}/${pairs}`);upd();
+  $$('.card-tile',api.el).forEach(b=>b.onclick=()=>{
+    if(lock||b.classList.contains('open')||b.classList.contains('done'))return;
+    b.classList.add('open');
+    if(!first){first=b;return}
+    moves++;lock=true;const a=first;first=null;
+    if(cards[a.dataset.i]===cards[b.dataset.i]){found++;a.classList.replace('open','done');b.classList.replace('open','done');lock=false;sfx.ok();upd();
+      if(found===pairs){const secs=(Date.now()-t0)/1000;let score=Math.round(1000*Math.min(1,(pairs/moves)*1.5));score-=Math.max(0,Math.round((secs-pairs*2.5)*3));api.finish(clamp(score,0,1000),[`${moves} moves`,`${secs.toFixed(1)}s`])}}
+    else{upd();api.setTimeout(()=>{a.classList.remove('open');b.classList.remove('open');lock=false},650)}
+  });
+}});
+
+/* --- Echo Sequence (Simon) --- */
+reg({id:'simon',name:'Echo Sequence',icon:'🎵',cat:'Memory',desc:'Watch the tiles light up, then repeat the sequence. It grows by one every round.',how:'Score 100 per completed round.',
+start(api){
+  const n=Math.min(9,4+Math.floor((api.diff-1)/2));const cols=n<=4?2:3;
+  const colors=['#ff5c7a','#3ddc97','#6c8cff','#ffc857','#c77dff','#ff9f43','#2ec4b6','#f368e0','#a3cb38'];
+  const speed=Math.max(280,620-api.diff*35);
+  let seq=[],idx=0,round=0,input=false;
+  api.el.innerHTML=`<div class="simon" style="grid-template-columns:repeat(${cols},1fr)">${Array.from({length:n},(_,i)=>`<button class="simon-tile" data-i="${i}" style="--c:${colors[i]}"></button>`).join('')}</div><div class="center muted" id="simon-msg" style="margin-top:14px">Watch…</div>`;
+  const tiles=$$('.simon-tile',api.el),msg=$('#simon-msg',api.el);
+  const flash=(i,ms)=>{tiles[i].classList.add('lit');beep(260+i*60,ms*.8);api.setTimeout(()=>tiles[i].classList.remove('lit'),ms)};
+  function play(){input=false;round++;seq.push(rndInt(0,n-1));api.hud(`Round ${round}`);msg.textContent='Watch…';
+    seq.forEach((s,k)=>api.setTimeout(()=>{flash(s,speed*.75);if(k===seq.length-1)api.setTimeout(()=>{input=true;idx=0;msg.textContent='Your turn'},speed)},400+k*speed))}
+  tiles.forEach(t=>t.onclick=()=>{if(!input)return;const i=+t.dataset.i;flash(i,200);
+    if(i===seq[idx]){idx++;if(idx===seq.length){input=false;msg.textContent='✓ Nice';api.setTimeout(play,700)}}
+    else{input=false;msg.textContent='✗ Wrong tile';tiles[seq[idx]].classList.add('hint');sfx.bad();api.setTimeout(()=>api.finish((round-1)*100,[`${round-1} rounds`,`${n} tiles`]),900)}});
+  api.setTimeout(play,600);
+}});
+
+/* --- Grid Recall --- */
+reg({id:'grid',name:'Grid Recall',icon:'🟦',cat:'Memory',desc:'Memorize the highlighted cells, then tap them back from memory. Two lives.',how:'Score 100 per cell in your longest pattern.',
+start(api){
+  const d=api.diff;const n=Math.min(7,4+Math.floor((d-1)/3));
+  let count=3+Math.floor((d-1)/2),best=0,lives=2,pattern,picked,phase='wait';
+  api.el.innerHTML=`<div class="center muted" id="gr-msg" style="min-height:22px"></div><div class="sgrid" id="gr" style="grid-template-columns:repeat(${n},1fr)">${Array.from({length:n*n},(_,i)=>`<button class="scell" data-i="${i}"></button>`).join('')}</div>`;
+  const cells=$$('.scell',api.el),msg=$('#gr-msg',api.el);
+  const hud=()=>api.hud(`Cells ${count} · Lives ${'❤️'.repeat(lives)||'—'}`);
+  function show(){phase='show';picked=new Set();pattern=new Set(shuffle([...Array(n*n).keys()]).slice(0,count));
+    cells.forEach((c,i)=>c.className='scell'+(pattern.has(i)?' lit':''));msg.textContent=`Memorize ${count} cells`;hud();
+    api.setTimeout(()=>{cells.forEach(c=>c.className='scell');phase='input';msg.textContent='Now tap them'},800+count*220)}
+  function finish(){api.finish(best*100,[`${best} cells`,`${n}×${n} grid`])}
+  cells.forEach(c=>c.onclick=()=>{if(phase!=='input')return;const i=+c.dataset.i;if(picked.has(i))return;picked.add(i);
+    if(pattern.has(i)){c.classList.add('ok');if(picked.size===count){best=Math.max(best,count);count++;phase='wait';msg.textContent='✓ Correct';sfx.ok();api.setTimeout(show,700)}}
+    else{c.classList.add('bad');phase='wait';sfx.bad();cells.forEach((cc,k)=>{if(pattern.has(k)&&!picked.has(k))cc.classList.add('lit')});lives--;hud();
+      if(lives<0){msg.textContent='Out of lives';api.setTimeout(finish,1200)}else{msg.textContent='✗ Try that size again';api.setTimeout(show,1300)}}});
+  api.setTimeout(show,500);
+}});
+
+/* --- Digit Span --- */
+reg({id:'digits',name:'Digit Span',icon:'🔢',cat:'Memory',desc:'A number flashes briefly. Type it back from memory. Each round adds a digit.',how:'At difficulty 6+ you must type it backwards.',
+start(api){
+  const d=api.diff;let len=3+Math.floor(d/2),best=0,lives=1,num='';const reverse=d>=6;
+  api.el.innerHTML=`<div class="center muted" id="ds-msg" style="min-height:22px"></div><div class="prompt huge" id="ds-num" style="font-size:64px;letter-spacing:6px"></div><input id="ds-in" class="answer" inputmode="numeric" autocomplete="off" hidden>`;
+  const msg=$('#ds-msg',api.el),disp=$('#ds-num',api.el),inp=$('#ds-in',api.el);
+  const hud=()=>api.hud(`Digits ${len} · Lives ${lives+1}${reverse?' · REVERSE':''}`);
+  function show(){num=String(rndInt(1,9))+Array.from({length:len-1},()=>rndInt(0,9)).join('');inp.hidden=true;inp.value='';disp.textContent=num;msg.textContent='Memorize…';hud();
+    api.setTimeout(()=>{disp.textContent='';inp.hidden=false;inp.focus();msg.textContent=reverse?'Type it BACKWARDS':'Type it back'},500+len*380)}
+  inp.addEventListener('keydown',e=>{if(e.key!=='Enter'||!inp.value)return;const target=reverse?[...num].reverse().join(''):num;
+    if(inp.value.trim()===target){best=Math.max(best,len);len++;msg.textContent='✓';sfx.ok();inp.hidden=true;api.setTimeout(show,600)}
+    else{lives--;sfx.bad();inp.hidden=true;disp.textContent=num;msg.textContent=`✗ It was ${num}`;
+      if(lives<0)api.setTimeout(()=>api.finish(Math.round(best*100*(reverse?1.2:1)),[`${best} digits`,reverse?'reverse':'forward'],{len:best}),1400);else api.setTimeout(show,1400)}});
+  api.setTimeout(show,400);
+}});
+
+/* --- N-Back --- */
+reg({id:'nback',name:'N-Back',icon:'🔁',cat:'Memory',desc:'Letters stream by. Hit MATCH when the current letter equals the one N steps back.',how:'N grows with difficulty: 1, then 2, then 3.',
+start(api){
+  const d=api.diff;const N=d<=2?1:d<=6?2:3;const trials=20+d*2;const interval=Math.max(1300,2200-d*90);
+  const letters='BCDFGHJKLMNPRSTVXZ';const seq=[];let i=-1,hits=0,miss=0,fa=0,responded=false;
+  for(let t=0;t<trials;t++){if(t>=N&&Math.random()<0.35)seq.push(seq[t-N]);else{let l;do{l=letters[rndInt(0,letters.length-1)]}while(t>=N&&l===seq[t-N]);seq.push(l)}}
+  const targets=seq.filter((l,t)=>t>=N&&l===seq[t-N]).length;
+  api.el.innerHTML=`<div class="center muted">N = <b style="color:var(--text)">${N}</b> · press MATCH when the letter equals the one ${N} step${N>1?'s':''} ago</div><div class="prompt huge" id="nb"></div><button class="btn big-btn" id="nb-match">MATCH <kbd>space</kbd></button><div class="center" id="fb"></div>`;
+  const disp=$('#nb',api.el),fb=$('#fb',api.el);
+  const hud=()=>api.hud(`${i+1}/${trials} · hits ${hits}/${targets} · false ${fa}`);
+  function respond(){if(i<N||responded)return;responded=true;if(seq[i]===seq[i-N]){hits++;flashFb(fb,'✓ hit','good');sfx.ok()}else{fa++;flashFb(fb,'✗ no match','bad');sfx.bad()}hud()}
+  $('#nb-match',api.el).onclick=respond;api.onKey(e=>{if(e.key===' '){e.preventDefault();respond()}});
+  function step(){if(i>=N&&!responded&&seq[i]===seq[i-N]){miss++;flashFb(fb,'missed','warn')}
+    i++;if(i>=trials){const hr=targets?hits/targets:1,nonT=trials-N-targets,far=nonT?fa/nonT:0;const score=Math.round(700*hr+300*(1-far));return api.finish(score,[`${hits}/${targets} hits`,`${fa} false alarms`,`N=${N}`],{perfect:hits===targets&&fa===0})}
+    responded=false;disp.textContent=seq[i];disp.style.opacity=1;disp.classList.remove('pop');void disp.offsetWidth;disp.classList.add('pop');hud();
+    api.setTimeout(()=>{disp.style.opacity=.12},interval*.7);api.setTimeout(step,interval)}
+  api.setTimeout(step,500);
+}});
+
+/* --- Color Clash (Stroop) --- */
+reg({id:'stroop',name:'Color Clash',icon:'🎨',cat:'Attention',desc:'Pick the ink color of the word, not what it says. Fight the interference for 45 seconds.',how:'At difficulty 5+ the rule sometimes flips to "what the word says".',
+start(api){
+  const d=api.diff;
+  const COLORS=[{n:'RED',c:'#ff5c7a'},{n:'GREEN',c:'#3ddc97'},{n:'BLUE',c:'#6c8cff'},{n:'YELLOW',c:'#ffc857'},{n:'PURPLE',c:'#c77dff'},{n:'ORANGE',c:'#ff9f43'}];
+  const k=Math.min(6,4+Math.floor((d-1)/3));const pal=COLORS.slice(0,k);
+  let correct=0,wrong=0,cur,mode='COLOR';
+  api.el.innerHTML=`<div class="center" id="st-mode" style="font-weight:700;min-height:22px"></div><div class="prompt big" id="st-word"></div><div class="choices">${pal.map((p,i)=>`<button class="choice" data-i="${i}"><kbd>${i+1}</kbd>${p.n}</button>`).join('')}</div><div class="center" id="fb"></div>`;
+  const modeEl=$('#st-mode',api.el),word=$('#st-word',api.el),fb=$('#fb',api.el);
+  function next(){const w=rndInt(0,k-1);let c=rndInt(0,k-1);if(c===w&&Math.random()<0.8)c=(c+1+rndInt(0,k-2))%k;
+    mode=(d>=5&&Math.random()<0.4)?'WORD':'COLOR';cur={w,c};
+    modeEl.textContent=mode==='COLOR'?'Tap the INK COLOR':'Tap what the WORD SAYS';modeEl.className='center '+(mode==='COLOR'?'muted':'warn');
+    word.textContent=pal[w].n;word.style.color=pal[c].c}
+  function answer(i){const t=mode==='COLOR'?cur.c:cur.w;if(i===t){correct++;flashFb(fb,'✓','good')}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
+  $$('.choice',api.el).forEach(b=>b.onclick=()=>answer(+b.dataset.i));
+  api.onKey(e=>{const n=parseInt(e.key);if(n>=1&&n<=k)answer(n-1)});
+  api.countdown(45,()=>api.finish(clamp(correct*30-wrong*30,0,2000),[`${correct} correct`,`${wrong} wrong`,`${Math.round(100*correct/Math.max(1,correct+wrong))}% accuracy`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* --- Number Hunt (Schulte) --- */
+reg({id:'schulte',name:'Number Hunt',icon:'🔍',cat:'Attention',desc:'Find and tap the numbers in ascending order as fast as you can.',how:'Bigger tables at higher difficulty. Wrong taps add a 1s penalty.',
+start(api){
+  const d=api.diff;const n=d<4?5:d<8?6:7;const N=n*n;let next=1,errors=0;
+  api.el.innerHTML=`<div class="schulte" style="grid-template-columns:repeat(${n},1fr)">${shuffle([...Array(N).keys()].map(x=>x+1)).map(v=>`<button data-v="${v}">${v}</button>`).join('')}</div>`;
+  const elapsed=api.stopwatch();api.hud(`Find: 1`);
+  $$('button',api.el).forEach(b=>b.onclick=()=>{const v=+b.dataset.v;
+    if(v===next){b.classList.add('done');next++;api.hud(`Find: ${next}`);if(next>N){const t=elapsed()+errors;const par=N*.9;api.finish(clamp(Math.round(1000*par/t),0,1000),[`${t.toFixed(1)}s`,`${errors} misses`,`${n}×${n}`])}}
+    else{errors++;sfx.bad();b.classList.add('shake');api.setTimeout(()=>b.classList.remove('shake'),300)}});
+}});
+
+/* --- Reflex --- */
+reg({id:'react',name:'Reflex',icon:'⚡',cat:'Speed',desc:'Wait for green, then click (or press space) as fast as you can. Five rounds.',how:'At difficulty 4+ a yellow decoy tries to bait you. Early clicks cost 500 ms.',
+start(api){
+  const d=api.diff,rounds=5;let times=[],r=0,state='idle',t0=0;
+  api.el.innerHTML=`<div class="reflex" id="rf">Click to start round 1</div><div class="center muted" id="rf-log" style="margin-top:12px;min-height:22px"></div>`;
+  const box=$('#rf',api.el),log=$('#rf-log',api.el);
+  function arm(){state='wait';box.className='reflex wait';box.textContent='Wait for green…';const delay=rndInt(1000,3500);
+    if(d>=4&&Math.random()<0.45)api.setTimeout(()=>{if(state!=='wait')return;box.className='reflex decoy';box.textContent='Not yet!';api.setTimeout(()=>{if(state==='wait'){box.className='reflex wait';box.textContent='Wait for green…'}},420)},Math.round(delay*.5));
+    api.setTimeout(()=>{if(state!=='wait')return;state='go';box.className='reflex go';box.textContent='CLICK!';t0=performance.now()},delay)}
+  function tap(){
+    if(state==='idle')return arm();
+    if(state==='wait'){times.push(500);log.textContent='Too early! Counted as 500 ms';r++;sfx.bad()}
+    else if(state==='go'){const t=Math.round(performance.now()-t0);times.push(t);log.textContent=`${t} ms`;r++;sfx.ok()}
+    else return;
+    api.hud(times.map(t=>t+'ms').join(' · '));
+    if(r>=rounds){state='done';const avg=Math.round(times.reduce((a,b)=>a+b,0)/times.length);box.className='reflex';box.textContent=`Average ${avg} ms`;
+      api.setTimeout(()=>api.finish(clamp(Math.round((500-avg)*3.5),0,1000),[`avg ${avg} ms`,`best ${Math.min(...times)} ms`],{avg}),900);return}
+    state='idle';box.className='reflex';box.textContent=`Click to start round ${r+1}`}
+  box.onclick=tap;api.onKey(e=>{if(e.key===' '){e.preventDefault();tap()}});
+}});
+
+/* --- Quick Count (dot estimation) --- */
+reg({id:'dots',name:'Quick Count',icon:'⚫',cat:'Speed',desc:'Two clouds of dots. Which side has more? Trust your gut, 45 seconds.',how:'Use ← → keys or tap a side. Differences shrink as difficulty rises.',
+start(api){
+  const d=api.diff;let correct=0,wrong=0,more=0;const ratio=Math.max(1.08,1.6-d*.055);
+  api.el.innerHTML=`<div class="dots"><button class="side" data-s="0"></button><button class="side" data-s="1"></button></div><div class="center" id="fb"></div>`;
+  const sides=$$('.side',api.el),fb=$('#fb',api.el);
+  function svg(n){let s='<svg viewBox="0 0 100 100">';for(let i=0;i<n;i++)s+=`<circle cx="${(5+Math.random()*90).toFixed(1)}" cy="${(5+Math.random()*90).toFixed(1)}" r="${d>=7?2.2:2.8}" fill="#e9ecf8"/>`;return s+'</svg>'}
+  function next(){const base=rndInt(8,10+d*3);const other=Math.max(base+1,Math.round(base*ratio));more=rndInt(0,1);
+    sides[more].innerHTML=svg(other);sides[1-more].innerHTML=svg(base);sides.forEach(s=>s.style.visibility='visible');
+    if(d>=5)api.setTimeout(()=>sides.forEach(s=>s.style.visibility='hidden'),Math.max(500,1500-d*80))}
+  function answer(s){if(s===more){correct++;flashFb(fb,'✓','good')}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
+  sides.forEach(s=>s.onclick=()=>answer(+s.dataset.s));
+  api.onKey(e=>{if(e.key==='ArrowLeft')answer(0);if(e.key==='ArrowRight')answer(1)});
+  api.countdown(45,()=>api.finish(clamp(correct*45-wrong*45,0,2000),[`${correct} correct`,`${wrong} wrong`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* --- Math Sprint --- */
+reg({id:'math',name:'Math Sprint',icon:'➕',cat:'Math',desc:'Solve as many arithmetic problems as you can in 60 seconds.',how:'Type the answer and press Enter. Operators and sizes grow with difficulty.',
+start(api){
+  const d=api.diff;let correct=0,wrong=0,cur;
+  api.el.innerHTML=`<div class="prompt" id="q"></div><input id="ans" class="answer" inputmode="numeric" autocomplete="off" placeholder="?"><div class="center muted small">Enter to submit</div><div class="center" id="fb"></div>`;
+  const q=$('#q',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);
+  function gen(){const ops=d<=2?['+','-']:d<=4?['+','-','×']:['+','-','×','÷'];const op=pick(ops);const max=d<=2?20:d<=4?60:d<=6?100:250;let a,b,ans;
+    if(op==='+'){a=rndInt(2,max);b=rndInt(2,max);ans=a+b}
+    else if(op==='-'){a=rndInt(2,max);b=rndInt(1,a);ans=a-b}
+    else if(op==='×'){const m=d<=4?10:d<=6?12:16;a=rndInt(2,m);b=rndInt(2,m);ans=a*b}
+    else{const m=d<=6?12:16;b=rndInt(2,m);ans=rndInt(2,m);a=b*ans}
+    if(d>=7&&Math.random()<0.35){const c=rndInt(2,19);return{text:`${a} ${op} ${b} + ${c}`,ans:ans+c}}
+    return{text:`${a} ${op} ${b}`,ans}}
+  function next(){cur=gen();q.textContent=cur.text+' = ?';inp.value='';inp.focus()}
+  inp.addEventListener('keydown',e=>{if(e.key!=='Enter'||inp.value.trim()==='')return;
+    if(parseInt(inp.value,10)===cur.ans){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,`✗ ${cur.ans}`,'bad');sfx.bad()}
+    api.hud(`✓ ${correct}  ✗ ${wrong}`);next()});
+  api.countdown(60,()=>api.finish(clamp(correct*40-wrong*15,0,2000),[`${correct} correct`,`${wrong} wrong`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* --- Word Scramble --- */
+const WORDS={
+4:'able bake cold dark echo farm gold hope iron jump kind lamp moon nest open park quiz rain salt tree unit vast wind yard zero bird camp door fish gift bold clay drum edge frog glow hint jazz keen lion mist nose oval palm rope silk tide wolf'.split(' '),
+5:'apple beach chair dance eagle flame grape house juice knife lemon magic night ocean piano queen river storm table uncle voice water youth zebra bread cloud dream frost ghost light brick candy dwarf earth fence globe honey ivory jelly koala maple noble olive pearl radio sugar tiger vivid whale'.split(' '),
+6:'animal bridge candle desert engine forest garden hammer island jungle kitten ladder market needle orange pencil rabbit silver temple valley window yellow basket button castle dragon flower guitar mirror planet anchor branch cactus donkey fabric goblet helmet insect jacket lizard magnet napkin oyster puzzle rocket saddle tunnel violin walnut'.split(' '),
+7:'airport balance cabinet diamond dolphin evening freedom glacier harvest journey kingdom library machine nothing orchard painter quarter rainbow science teacher uniform village weather blanket chicken compass feather lantern morning pumpkin admiral bicycle captain dessert example factory gravity horizon imagine justice kitchen leopard monster nursery octopus penguin recipes sunrise tornado'.split(' '),
+8:'alphabet birthday calendar daughter elephant festival gardener hospital industry keyboard language mountain notebook umbrella painting question railroad sandwich treasure universe vacation bracelet champion dinosaur elevator football lollipop medicine princess sunshine aquarium backpack cinnamon doorbell envelope firewood graffiti hedgehog infinity jewelery kangaroo lavender magnetic necklace organism parachute'.split(' ')
+};
+reg({id:'scramble',name:'Word Scramble',icon:'🔤',cat:'Language',desc:'Unscramble as many words as you can in 60 seconds.',how:'Longer words at higher difficulty. Skipping costs a little.',
+start(api){
+  const d=api.diff;let solved=0,skipped=0,cur,used=new Set();
+  api.el.innerHTML=`<div class="prompt big" id="sw" style="letter-spacing:6px"></div><input id="ans" class="answer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word" style="width:300px;font-size:26px"><div class="center" style="margin-top:8px"><button class="btn sec" id="skip">Skip</button></div><div class="center" id="fb"></div>`;
+  const sw=$('#sw',api.el),inp=$('#ans',api.el),fb=$('#fb',api.el);
+  function len(){if(d>=9)return rndInt(5,8);return Math.min(8,4+Math.floor((d-1)/2))}
+  function next(){let w;do{w=pick(WORDS[len()])}while(used.has(w));used.add(w);let s;do{s=shuffle([...w]).join('')}while(s===w);cur=w;sw.textContent=s.toUpperCase();inp.value='';inp.focus()}
+  inp.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(inp.value.trim().toLowerCase()===cur){solved++;flashFb(fb,'✓ '+cur,'good');sfx.ok();api.hud(`Solved ${solved} · Skipped ${skipped}`);next()}else{flashFb(fb,'✗ try again','bad');inp.select()}});
+  $('#skip',api.el).onclick=()=>{skipped++;flashFb(fb,`skipped: ${cur}`,'warn');api.hud(`Solved ${solved} · Skipped ${skipped}`);next()};
+  api.countdown(60,()=>api.finish(clamp(solved*130-skipped*20,0,2000),[`${solved} solved`,`${skipped} skipped`]));
+  api.hud('Solved 0 · Skipped 0');next();
+}});
+
+/* --- Odd Word Out --- */
+const CATEGORIES=[
+  ['apple','banana','cherry','grape','mango','peach','plum','pear','kiwi','lemon'],
+  ['dog','cat','horse','cow','sheep','goat','pig','rabbit','mouse','deer'],
+  ['red','blue','green','yellow','purple','orange','pink','brown','gray','white'],
+  ['car','bus','train','plane','boat','bike','truck','tram','ferry','scooter'],
+  ['chair','table','sofa','bed','desk','shelf','stool','bench','wardrobe','dresser'],
+  ['hammer','wrench','saw','drill','chisel','pliers','screwdriver','level','file','clamp'],
+  ['piano','guitar','violin','drum','flute','trumpet','cello','harp','oboe','banjo'],
+  ['shirt','pants','jacket','socks','hat','scarf','gloves','dress','skirt','coat'],
+  ['oak','pine','maple','birch','willow','cedar','elm','ash','spruce','palm'],
+  ['soccer','tennis','golf','rugby','hockey','cricket','boxing','rowing','skiing','judo'],
+  ['paris','london','rome','berlin','madrid','tokyo','cairo','lima','oslo','dublin'],
+  ['doctor','nurse','teacher','pilot','chef','farmer','lawyer','baker','judge','actor'],
+  ['circle','square','triangle','oval','hexagon','cube','sphere','cone','prism','star'],
+  ['rain','snow','hail','fog','wind','storm','sleet','drizzle','thunder','frost'],
+  ['spoon','fork','knife','plate','bowl','cup','mug','ladle','whisk','tray'],
+  ['eagle','sparrow','owl','crow','robin','hawk','parrot','swan','pigeon','heron'],
+];
+reg({id:'oddword',name:'Odd Word Out',icon:'🕵️',cat:'Language',desc:'Four words, one intruder. Spot the word that does not belong before time runs out.',how:'Higher difficulty uses closer categories and more options.',
+start(api){
+  const d=api.diff;let correct=0,wrong=0,odd=0;const opts=d<4?4:d<8?5:6;
+  api.el.innerHTML=`<div class="center muted" style="margin-top:20px">Which word does not belong?</div><div class="choices" id="ch" style="margin-top:24px"></div><div class="center" id="fb"></div>`;
+  const ch=$('#ch',api.el),fb=$('#fb',api.el);
+  function next(){const [a,b]=shuffle(CATEGORIES).slice(0,2);const words=shuffle(a).slice(0,opts-1);const intruder=pick(b);
+    const all=shuffle([...words,intruder]);odd=all.indexOf(intruder);
+    ch.innerHTML=all.map((w,i)=>`<button class="choice" data-i="${i}"><kbd>${i+1}</kbd>${w}</button>`).join('');
+    $$('.choice',ch).forEach(bt=>bt.onclick=()=>answer(+bt.dataset.i))}
+  function answer(i){if(i===odd){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
+  api.onKey(e=>{const n=parseInt(e.key);if(n>=1&&n<=opts)answer(n-1)});
+  api.countdown(45,()=>api.finish(clamp(correct*50-wrong*40,0,2000),[`${correct} correct`,`${wrong} wrong`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* --- Pattern Finder (number sequences) --- */
+reg({id:'seq',name:'Pattern Finder',icon:'🧩',cat:'Logic',desc:'Work out the rule behind the number sequence and pick what comes next.',how:'More sequence types unlock at higher difficulty. 60 seconds.',
+start(api){
+  const d=api.diff;let correct=0,wrong=0,ans=0;
+  const gens=[
+    ()=>{const a=rndInt(1,20),s=rndInt(2,d<=3?9:20)*(d>=4&&Math.random()<.3?-1:1);return Array.from({length:6},(_,i)=>a+s*i)},
+    ()=>{const a=rndInt(1,5),r=rndInt(2,3);return Array.from({length:6},(_,i)=>a*r**i)},
+    ()=>{const k=rndInt(1,7);return Array.from({length:6},(_,i)=>(k+i)**2)},
+    ()=>{const s=[rndInt(1,5),rndInt(1,8)];while(s.length<6)s.push(s.at(-1)+s.at(-2));return s},
+    ()=>{const x=rndInt(2,9),y=rndInt(1,6);const s=[rndInt(1,10)];for(let i=0;i<5;i++)s.push(s.at(-1)+(i%2?y:x));return s},
+    ()=>{const c=rndInt(1,4);let step=rndInt(1,5);const s=[rndInt(1,10)];for(let i=0;i<5;i++){s.push(s.at(-1)+step);step+=c}return s},
+    ()=>{const P=[2,3,5,7,11,13,17,19,23,29,31,37,41,43,47];const k=rndInt(0,9);return P.slice(k,k+6)},
+    ()=>{const m=rndInt(2,3),c=rndInt(1,5)*(Math.random()<.5?-1:1);const s=[rndInt(1,6)];for(let i=0;i<5;i++)s.push(s.at(-1)*m+c);return s},
+    ()=>{const k=rndInt(1,5);return Array.from({length:6},(_,i)=>(k+i)**3)},
+    ()=>{const a=rndInt(2,9),b=rndInt(2,9);return Array.from({length:6},(_,i)=>i%2?b*(Math.floor(i/2)+1):a*(Math.floor(i/2)+1))},
+  ];
+  const allowed=gens.slice(0,Math.min(gens.length,2+d));
+  api.el.innerHTML=`<div class="seqline" id="sq"></div><div class="choices" id="ch"></div><div class="center" id="fb"></div>`;
+  const sq=$('#sq',api.el),ch=$('#ch',api.el),fb=$('#fb',api.el);
+  function next(){let s;do{s=pick(allowed)()}while(s.some(v=>Math.abs(v)>100000));ans=s[5];
+    const shown=s.slice(0,5);const opts=new Set([ans]);const spread=Math.max(1,Math.abs(s[4]-s[3]));
+    let guard=0;while(opts.size<4&&guard++<100){const o=ans+pick([-1,1])*rndInt(1,Math.max(2,Math.round(spread*1.2)));opts.add(o)}
+    const arr=shuffle([...opts]);sq.innerHTML=shown.join(', ')+', <span class="q">?</span>';
+    ch.innerHTML=arr.map((o,i)=>`<button class="choice" data-v="${o}"><kbd>${i+1}</kbd>${o}</button>`).join('');
+    $$('.choice',ch).forEach(bt=>bt.onclick=()=>answer(+bt.dataset.v))}
+  function answer(v){if(v===ans){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,`✗ it was ${ans}`,'bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
+  api.onKey(e=>{const n=parseInt(e.key);const bt=$$('.choice',ch)[n-1];if(bt)answer(+bt.dataset.v)});
+  api.countdown(60,()=>api.finish(clamp(correct*100-wrong*50,0,2000),[`${correct} correct`,`${wrong} wrong`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* --- Mind Maze (spatial rotation / logic) --- */
+reg({id:'rotate',name:'Shape Shift',icon:'🔄',cat:'Logic',desc:'Is the right shape a rotation of the left one, or a mirror image? Decide fast.',how:'Press ← for Rotation, → for Mirror. 45 seconds; shapes get more complex.',
+start(api){
+  const d=api.diff;let correct=0,wrong=0,isMirror=false;const cellsN=Math.min(8,4+Math.floor(d/2));
+  api.el.innerHTML=`<div class="dots" id="pair"></div><div class="choices" style="margin-top:16px;max-width:420px"><button class="choice" data-a="0"><kbd>←</kbd>Rotation</button><button class="choice" data-a="1"><kbd>→</kbd>Mirror</button></div><div class="center" id="fb"></div>`;
+  const pair=$('#pair',api.el),fb=$('#fb',api.el);
+  function shape(){const cells=new Set(['2,2']);const arr=['2,2'];while(cells.size<cellsN){const [x,y]=pick(arr).split(',').map(Number);const [dx,dy]=pick([[1,0],[-1,0],[0,1],[0,-1]]);const nx=clamp(x+dx,0,4),ny=clamp(y+dy,0,4);const k=nx+','+ny;if(!cells.has(k)){cells.add(k);arr.push(k)}}return arr.map(k=>k.split(',').map(Number))}
+  const rot=(pts,t)=>pts.map(([x,y])=>{for(let i=0;i<t;i++)[x,y]=[4-y,x];return[x,y]});
+  const mirror=pts=>pts.map(([x,y])=>[4-x,y]);
+  const svg=pts=>`<svg viewBox="-0.5 -0.5 6 6">${pts.map(([x,y])=>`<rect x="${x}" y="${y}" width=".92" height=".92" rx=".12" fill="#6c8cff"/>`).join('')}</svg>`;
+  function next(){const base=shape();isMirror=Math.random()<.5;let other=isMirror?mirror(base):base;other=rot(other,rndInt(1,3));
+    pair.innerHTML=`<div class="side" style="cursor:default">${svg(base)}</div><div class="side" style="cursor:default">${svg(other)}</div>`}
+  function answer(a){if((a===1)===isMirror){correct++;flashFb(fb,'✓','good');sfx.ok()}else{wrong++;flashFb(fb,'✗','bad');sfx.bad()}api.hud(`✓ ${correct}  ✗ ${wrong}`);next()}
+  $$('.choice',api.el).forEach(b=>b.onclick=()=>answer(+b.dataset.a));
+  api.onKey(e=>{if(e.key==='ArrowLeft')answer(0);if(e.key==='ArrowRight')answer(1)});
+  api.countdown(45,()=>api.finish(clamp(correct*60-wrong*60,0,2000),[`${correct} correct`,`${wrong} wrong`]));
+  api.hud('✓ 0  ✗ 0');next();
+}});
+
+/* ================= boot ================= */
+dailyState();renderHome();showScreen('home');
+</script>
+</body>
+</html>

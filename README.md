@@ -35,6 +35,19 @@ https://dansimau.github.io/brainbop/
 - **Brain Score.** The average of your recent form (last five scores) in each category, then averaged across categories. Shown on the home screen with per-category bars.
 - **Badges.** 22 achievements for milestones like play counts, levels, streaks, daily workouts, high scores, and a few game-specific feats.
 
-The Stats tab shows totals, a 12-week activity heatmap, per-game sparklines of recent scores, and a Reset button.
+The Stats tab shows the cloud sync controls, totals, a 12-week activity heatmap, and per-game sparklines of recent scores.
 
-All progress lives in the browser's localStorage. It never leaves the device.
+## Progress and sync
+
+Progress is saved in the browser's localStorage as an append-only log of plays. Stats, levels, streaks and badges are all computed from that log. Nothing is ever edited or deleted, and there is no reset.
+
+Optionally, tap the ☁️ button in the header (or the Cloud sync panel on the Stats tab) and **Sign in with Google** to back the log up to the cloud (Supabase). Once signed in, every play is pushed as it happens and plays from your other devices are pulled in, so clearing the browser or switching devices no longer loses progress. Only your account ID and game results are stored. Sync is only available when the page is served over http(s); opened from disk, the app works exactly as before without it.
+
+The storage key is `brainbop_v2`. Progress saved by earlier versions under `brainbop_v1` is migrated automatically the first time the new version loads.
+
+### Setting up your own Supabase project
+
+1. Create a project at https://supabase.com and run `supabase/schema.sql` in the SQL editor.
+2. In Google Cloud Console create an OAuth client (Web application) with the redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`. Paste its Client ID and Secret into Authentication → Providers → Google in Supabase.
+3. In Authentication → URL Configuration set the Site URL to where you host the page and add `http://localhost:8765/**` for local testing.
+4. Put the project URL and publishable key into `SUPA_URL` and `SUPA_KEY` in `index.html`. Both are safe to publish; row-level security keeps each user's rows private.

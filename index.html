@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BrainBop · Brain Training</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🧠</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box}
 :root{--bg:#0e1120;--panel:#171b2e;--panel2:#1f2440;--line:#2a3155;--text:#e9ecf8;--muted:#8f97bb;--accent:#6c8cff;--pink:#ff7ab6;--good:#3ddc97;--bad:#ff5c7a;--warn:#ffc857;--r:14px}
@@ -132,7 +133,13 @@ kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius
 .badge .ds{font-size:12px;color:var(--muted);margin-top:4px}
 .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;z-index:9;animation:fade 3s forwards}
 @keyframes fade{0%,75%{opacity:1}100%{opacity:0}}
-.danger{color:var(--bad);text-decoration:underline;font-size:13px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:8;padding:16px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;width:100%;max-width:420px;position:relative}
+.modal .x{position:absolute;top:6px;right:8px;font-size:18px;color:var(--muted);padding:6px 10px;border-radius:8px}
+.modal .x:hover{background:var(--panel2)}
+.gsi{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:4px;background:#fff;border:1px solid #747775;color:#1f1f1f;font:500 14px/20px "Google Sans",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.25px}
+.gsi:hover{background:#f2f2f2}
+.gsi svg{width:20px;height:20px;flex:none;margin-right:10px}
 .heat{display:grid;grid-template-columns:repeat(auto-fill,14px);gap:3px;margin-top:8px}
 .heat i{width:14px;height:14px;border-radius:3px;background:var(--line);display:block}
 .heat i.l1{background:#2f4a8a}.heat i.l2{background:#4a6cd0}.heat i.l3{background:var(--accent)}.heat i.l4{background:var(--pink)}
@@ -148,6 +155,7 @@ kbd{font:600 11px system-ui;background:var(--line);padding:2px 6px;border-radius
     </div>
     <div class="chip" id="streak-chip" title="Daily streak">🔥 0</div>
     <button class="chip" id="sound-btn" title="Toggle sound">🔊</button>
+    <button class="chip" id="sync-chip" title="Cloud sync">☁️</button>
   </header>
 
   <section id="home" class="screen active"></section>
@@ -198,13 +206,114 @@ function beep(f=440,ms=150,type='sine'){
 const sfx={ok:()=>beep(660,90),bad:()=>beep(160,180,'square'),win:()=>{beep(523,120);setTimeout(()=>beep(659,120),120);setTimeout(()=>beep(784,200),240)}};
 
 /* ================= state ================= */
-const KEY='brainbop_v1';
+// L is the source of truth: an append-only log of records (L.recs) plus device prefs. S is derived from it by derive().
+const KEY='brainbop_v2';
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const defaultState=()=>({xp:0,games:{},history:[],streak:{count:0,last:null},ach:[],daily:{date:null,done:[]},dailyCount:0,totalPlays:0,sound:true,days:{}});
-let S=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));return s?Object.assign(defaultState(),s):defaultState()}catch(e){return defaultState()}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let L=load(),S=null;
+function load(){
+  try{const v2=JSON.parse(localStorage.getItem(KEY));if(v2&&Array.isArray(v2.recs))return Object.assign({recs:[],sound:true,sync:{}},v2)}catch(e){}
+  // One-time migration from brainbop_v1. Once KEY exists, v1 is never read or written again.
+  const l={recs:[],sound:true,sync:{}};
+  try{const v1=JSON.parse(localStorage.getItem('brainbop_v1'));
+    if(v1){l.sound=v1.sound!==false;if(v1.totalPlays>0)l.recs.push({id:uid(),t:Date.now(),g:'_base',xp:v1.xp||0,games:v1.games||{},days:v1.days||{},ach:v1.ach||[],dailyCount:v1.dailyCount||0,totalPlays:v1.totalPlays,u:1})}}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify(l))}catch(e){}
+  return l;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(L))}catch(e){}}
 function gs(id){return S.games[id]||(S.games[id]={best:0,plays:0,total:0,diff:1,hist:[]})}
+function streakFrom(days){const d=new Date();if(!days[dateStr(d)])d.setDate(d.getDate()-1);let count=0,last=null;while(days[dateStr(d)]){if(!last)last=dateStr(d);count++;d.setDate(d.getDate()-1)}return{count,last}}
+function derive(){
+  const s=defaultState();s.sound=L.sound!==false;const plays=[];
+  for(const r of [...L.recs].sort((a,b)=>a.t-b.t)){
+    for(const a of r.a||[])if(!s.ach.includes(a))s.ach.push(a);
+    if(r.g==='_base'){
+      s.xp+=r.xp||0;s.totalPlays+=r.totalPlays||0;s.dailyCount+=r.dailyCount||0;
+      for(const k in r.days||{})s.days[k]=(s.days[k]||0)+r.days[k];
+      for(const a of r.ach||[])if(!s.ach.includes(a))s.ach.push(a);
+      for(const id in r.games||{}){const b=r.games[id],g=s.games[id]||(s.games[id]={best:0,plays:0,total:0,diff:1,hist:[]});g.plays+=b.plays||0;g.total+=b.total||0;g.best=Math.max(g.best,b.best||0);g.diff=Math.max(g.diff,b.diff||1);g.hist=g.hist.concat(b.hist||[]).slice(-40)}
+      continue}
+    const g=s.games[r.g]||(s.games[r.g]={best:0,plays:0,total:0,diff:1,hist:[]});
+    g.plays++;g.total+=r.s;g.best=Math.max(g.best,r.s);g.hist.push(r.s);if(g.hist.length>40)g.hist.shift();
+    if(r.s>=750)g.diff=Math.min(10,g.diff+1);else if(r.s<350)g.diff=Math.max(1,g.diff-1);
+    s.xp+=r.x||0;s.totalPlays++;s.days[r.d]=(s.days[r.d]||0)+1;if(r.dc)s.dailyCount++;plays.push(r);
+  }
+  s.history=plays.slice(-500).map(r=>({d:r.d,g:r.g,s:r.s}));
+  s.streak=streakFrom(s.days);
+  const t=today();s.daily={date:t,done:dailyGames().filter(id=>plays.some(r=>r.d===t&&r.g===id))};
+  for(const a of ACH){if(s.ach.includes(a.id)||a.t.length>1)continue;try{if(a.t(s))s.ach.push(a.id)}catch(e){}}
+  S=s;
+}
 function levelInfo(xp){let l=1,need=100,rem=xp;while(rem>=need){rem-=need;l++;need=Math.round(need*1.2)}return{level:l,into:rem,need}}
+
+/* ================= sync ================= */
+// Optional cloud backup via Supabase. Everything below no-ops when sb is null (file://, offline, CDN blocked).
+const SUPA_URL='https://eqjftlpxngeeqemmktoo.supabase.co',SUPA_KEY='sb_publishable_sc38j58fO-jaeUXz-x53fg_xAfHI1cC';
+const sb=(window.supabase&&location.protocol!=='file:')?supabase.createClient(SUPA_URL,SUPA_KEY):null;
+let syncUser=null,syncState='idle',syncAt=null,syncBusy=false,syncLast=0;
+function commit(){save();renderHeader();pushPending()}
+function setSync(st){syncState=st;renderSyncUI()}
+async function pushPending(){
+  if(!sb||!syncUser)return true;
+  const rows=L.recs.filter(r=>r.u);if(!rows.length)return true;
+  for(let i=0;i<rows.length;i+=500){const chunk=rows.slice(i,i+500);
+    const{error}=await sb.from('recs').upsert(chunk.map(r=>{const d={...r};delete d.u;return{id:r.id,t:r.t,data:d}}),{onConflict:'user_id,id',ignoreDuplicates:true});
+    if(error){setSync('error');return false}
+    chunk.forEach(r=>delete r.u)}
+  save();return true;
+}
+async function pull(){
+  let n=0,cursor=L.sync.cursor||'1970-01-01T00:00:00Z';const have=new Set(L.recs.map(r=>r.id));
+  for(;;){const{data,error}=await sb.from('recs').select('id,t,data,created_at').gte('created_at',cursor).order('created_at').order('id').limit(1000);
+    if(error)throw error;let added=0;
+    for(const row of data)if(!have.has(row.id)){have.add(row.id);L.recs.push(row.data);added++}
+    n+=added;if(data.length)L.sync.cursor=cursor=data[data.length-1].created_at;
+    if(data.length<1000||!added)break}
+  return n;
+}
+async function fullSync(){
+  if(!sb||!syncUser||syncBusy)return;syncBusy=true;setSync('syncing');
+  try{if(!await pushPending())throw 0;const n=await pull();syncAt=Date.now();derive();save();setSync('ok');rerender();if(n)toast(`Synced · ${n} new play${n===1?'':'s'}`)}
+  catch(e){setSync('error')}
+  syncBusy=false;syncLast=Date.now();
+}
+function maybeSync(){if(syncUser&&Date.now()-syncLast>30000)fullSync()}
+function signIn(){sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}})}
+function signOut(){sb.auth.signOut()}
+function rerender(){const id=($('.screen.active')||{}).id;if(id==='home')renderHome();else if(id==='stats')renderStats();else if(id==='badges')renderBadges();else renderHeader()}
+function renderSyncChip(){const c=$('#sync-chip');c.hidden=!sb;c.textContent=syncState==='syncing'?'☁️ …':syncState==='error'?'☁️ ⚠️':syncUser?'☁️ ✓':'☁️';c.title=syncState==='error'?'Sync failed · tap to retry':syncUser?'Cloud sync on':'Cloud sync'}
+// Google "Sign in with Google" button per https://developers.google.com/identity/branding-guidelines (light theme; standard-colour G, unaltered).
+const GSI_BTN=`<button class="gsi" data-sync="in"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>`;
+function syncPanelHtml(){
+  if(!sb)return`<div class="small muted">Sync is unavailable when the page is opened from disk or the sync library could not load. Your progress is still saved in this browser.</div>`;
+  const note=`<div class="small muted" style="margin-top:10px">Only your account ID and game results are stored.</div>`;
+  if(!syncUser)return`<div class="small muted">Back up your plays and sync progress between devices.</div><div style="margin-top:12px">${GSI_BTN}</div>${note}`;
+  const st=syncState==='syncing'?'Syncing…':syncState==='error'?'Sync failed · will retry':syncAt?`Last synced ${new Date(syncAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`:'Connected';
+  return`<div><b>☁️ Signed in</b> <span class="small muted">· ${st}</span></div><div style="margin-top:12px"><button class="btn sec" data-sync="out">Sign out</button></div>${note}`;
+}
+function bindSync(){$$('[data-sync=in]').forEach(b=>b.onclick=signIn);$$('[data-sync=out]').forEach(b=>b.onclick=signOut)}
+function renderSyncUI(){renderSyncChip();$$('.sync-body').forEach(p=>p.innerHTML=syncPanelHtml());bindSync()}
+function openSyncModal(){
+  if($('.modal-bg'))return;
+  const bg=document.createElement('div');bg.className='modal-bg';
+  bg.innerHTML=`<div class="modal"><button class="x" aria-label="Close">✕</button><h3>☁️ Cloud sync</h3><div class="sync-body">${syncPanelHtml()}</div></div>`;
+  const close=()=>{bg.remove();document.removeEventListener('keydown',esc)};const esc=e=>{if(e.key==='Escape')close()};
+  bg.onclick=e=>{if(e.target===bg)close()};$('.x',bg).onclick=close;document.addEventListener('keydown',esc);
+  document.body.appendChild(bg);bindSync();
+}
+if(sb){
+  sb.auth.onAuthStateChange((ev,session)=>{
+    const u=session&&session.user||null;
+    if(u&&L.sync.uid&&L.sync.uid!==u.id){
+      if(!confirm('This browser has progress from a different account. Replace it with this account\'s progress?')){sb.auth.signOut();return}
+      L.recs=[];L.sync={}}
+    syncUser=u;
+    if(u){L.sync.uid=u.id;save();if(location.search.includes('code='))history.replaceState(null,'',location.pathname);fullSync()}
+    renderSyncUI();
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeSync()});
+  window.addEventListener('online',maybeSync);
+}
 
 /* ================= game registry ================= */
 const GAMES=[];const G={};
@@ -236,11 +345,10 @@ const ACH=[
   {id:'xp5k',ico:'💎',nm:'Dedicated',ds:'Earn 5,000 XP',t:s=>s.xp>=5000},
   {id:'xp25k',ico:'💠',nm:'Obsessed',ds:'Earn 25,000 XP',t:s=>s.xp>=25000},
 ];
-function checkAch(ctx){const out=[];for(const a of ACH){if(S.ach.includes(a.id))continue;try{if(a.t(S,ctx)){S.ach.push(a.id);out.push(a)}}catch(e){}}return out}
 
 /* ================= daily workout ================= */
 function dailyGames(){const r=seeded('daily'+today());const ids=GAMES.map(g=>g.id);const out=[];while(out.length<3){const id=ids[Math.floor(r()*ids.length)];if(!out.includes(id))out.push(id)}return out}
-function dailyState(){if(S.daily.date!==today()){S.daily={date:today(),done:[]};save()}return S.daily}
+function dailyState(){if(S.daily.date!==today())derive();return S.daily}
 
 /* ================= brain score ================= */
 function recentAvg(id,n=5){const g=S.games[id];if(!g||!g.hist.length)return null;const h=g.hist.slice(-n);return h.reduce((a,b)=>a+Math.min(1000,b),0)/h.length}
@@ -250,7 +358,8 @@ function brainScore(){const cs=Object.values(catScores()).filter(v=>v!=null);ret
 /* ================= screens ================= */
 function showScreen(id){$$('.screen').forEach(s=>s.classList.toggle('active',s.id===id));$$('nav button').forEach(b=>b.classList.toggle('active',b.dataset.nav===id));window.scrollTo(0,0)}
 $$('nav button').forEach(b=>b.onclick=()=>{if(current)abortGame();const id=b.dataset.nav;if(id==='home')renderHome();if(id==='stats')renderStats();if(id==='badges')renderBadges();showScreen(id)});
-$('#sound-btn').onclick=()=>{S.sound=!S.sound;save();renderHeader();if(S.sound)beep(660,80)};
+$('#sound-btn').onclick=()=>{L.sound=!S.sound;derive();commit();if(S.sound)beep(660,80)};
+$('#sync-chip').onclick=openSyncModal;
 
 function renderHeader(){
   const li=levelInfo(S.xp);
@@ -298,7 +407,8 @@ function renderStats(){
   const avg=played.length?Math.round(played.reduce((a,g)=>a+g.total,0)/played.reduce((a,g)=>a+g.plays,0)):0;
   // heatmap of last 12 weeks
   const cells=[];for(let i=83;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=dateStr(d);const n=S.days[k]||0;cells.push(`<i class="${n?n>=6?'l4':n>=4?'l3':n>=2?'l2':'l1':''}" title="${k}: ${n} game${n===1?'':'s'}"></i>`)}
-  let html=`<div class="panel"><h3>Overview</h3><div class="kpis">
+  let html=`<h2 style="margin-top:0">Cloud sync</h2><div class="panel sync-body">${syncPanelHtml()}</div>
+  <h2>Overview</h2><div class="panel"><div class="kpis">
     <div class="kpi"><b>${li.level}</b><span>Level</span></div>
     <div class="kpi"><b>${S.xp}</b><span>Total XP</span></div>
     <div class="kpi"><b>${bs==null?'—':bs}</b><span>Brain score</span></div>
@@ -312,10 +422,9 @@ function renderStats(){
   <h2>Per game</h2><div class="panel">
   <div class="stat-row muted small"><span></span><span>Game</span><span>Recent scores</span><span class="r">Best</span><span class="r">Lvl</span></div>
   ${GAMES.map(g=>{const s=S.games[g.id];return`<div class="stat-row"><span style="font-size:22px">${g.icon}</span><span><b>${g.name}</b><br><span class="muted small">${g.cat} · ${s?s.plays:0} plays · avg ${s&&s.plays?Math.round(s.total/s.plays):'—'}</span></span>${spark(s&&s.hist)}<span class="r"><b>${s&&s.plays?s.best:'—'}</b></span><span class="r muted">${s?s.diff:1}</span></div>`}).join('')}
-  </div>
-  <div class="center" style="margin-top:24px"><button class="danger" id="reset-btn">Reset all progress</button></div>`;
+  </div>`;
   $('#stats').innerHTML=html;
-  $('#reset-btn').onclick=()=>{if(confirm('Erase all progress, scores and badges? This cannot be undone.')){S=defaultState();save();renderStats();renderHeader();toast('Progress reset')}};
+  bindSync();
 }
 function renderBadges(){
   renderHeader();
@@ -359,25 +468,25 @@ document.addEventListener('keydown',e=>{if(current&&current.key&&!current.done)c
 function endGame(id,score,details,extra){
   if(!current||current.id!==id||current.done)return;
   clearCurrent();
-  const g=G[id];const st=gs(id);const t=today();
-  const firstPlay=st.plays===0;const isBest=!firstPlay&&score>st.best;
-  const diffBefore=st.diff;
-  st.plays++;st.total+=score;st.best=Math.max(st.best,score);st.hist.push(score);if(st.hist.length>40)st.hist.shift();
-  if(score>=750)st.diff=Math.min(10,st.diff+1);else if(score<350)st.diff=Math.max(1,st.diff-1);
+  const g=G[id];const before=gs(id);const t=today();
+  const firstPlay=before.plays===0;const isBest=!firstPlay&&score>before.best;
+  const diffBefore=before.diff;
   let xp=Math.round(score/10*(1+0.15*(diffBefore-1)));
   if(isBest)xp+=25;if(firstPlay)xp+=20;
-  const lvlBefore=levelInfo(S.xp).level;
-  S.xp+=xp;S.totalPlays++;
-  S.days[t]=(S.days[t]||0)+1;
-  if(S.streak.last!==t){S.streak.count=S.streak.last===yesterday()?S.streak.count+1:1;S.streak.last=t}
-  const d=dailyState();let dailyComplete=false;const ids=dailyGames();
-  if(ids.includes(id)&&!d.done.includes(id)){d.done.push(id);if(ids.every(i=>d.done.includes(i))){dailyComplete=true;S.xp+=150;xp+=150;S.dailyCount++}}
-  S.history.push({d:t,g:id,s:score});if(S.history.length>500)S.history.shift();
-  const unlocked=checkAch({id,score,extra});
-  const lvlAfter=levelInfo(S.xp).level;
-  save();renderHeader();
+  const lvlBefore=levelInfo(S.xp).level;const achBefore=S.ach;
+  const d=dailyState();const ids=dailyGames();
+  const dailyComplete=ids.includes(id)&&!d.done.includes(id)&&ids.every(i=>i===id||d.done.includes(i));
+  if(dailyComplete)xp+=150;
+  // Append one immutable play record, then re-derive everything from the log.
+  const rec={id:uid(),t:Date.now(),d:t,g:id,s:score,x:xp,df:diffBefore,u:1};if(dailyComplete)rec.dc=1;
+  L.recs.push(rec);derive();
+  const ctx={id,score,extra};
+  const unlocked=ACH.filter(a=>{if(achBefore.includes(a.id))return false;if(S.ach.includes(a.id))return true;try{return a.t.length>1&&!!a.t(S,ctx)}catch(e){return false}});
+  if(unlocked.length){rec.a=unlocked.map(a=>a.id);for(const a of rec.a)if(!S.ach.includes(a))S.ach.push(a)}
+  const lvlAfter=levelInfo(S.xp).level;const st=gs(id);
+  commit();
   if(score>=750)sfx.win();
-  const nextDaily=ids.find(i=>!d.done.includes(i));
+  const nextDaily=ids.find(i=>!S.daily.done.includes(i));
   $('#result').innerHTML=`<div class="result panel">
     <div class="muted">${g.icon} ${g.name}</div>
     <div class="score">${score}</div>
@@ -692,7 +801,7 @@ start(api){
 }});
 
 /* ================= boot ================= */
-dailyState();renderHome();showScreen('home');
+derive();renderHome();showScreen('home');renderSyncChip();
 </script>
 </body>
 </html>

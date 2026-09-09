@@ -4,29 +4,31 @@ Guidance for AI coding agents and contributors working on BrainBop.
 
 ## What this is
 
-A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager, no external requests. That constraint is deliberate. Keep it.
+A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager. The one external resource is the supabase-js script used for optional cloud sync. That constraint is deliberate. Keep it.
 
 ## Hard rules
 
-1. **Single file.** All markup, styles, and script stay in `index.html`. Do not split into modules, add a bundler, or load anything from a CDN.
-2. **No dependencies.** Vanilla JS only. Features must work when the file is opened directly from disk (`file://`), so nothing may rely on `fetch`, service workers, or same-origin APIs beyond `localStorage` and Web Audio.
+1. **Single file.** All markup, styles, and script stay in `index.html`. Do not split into modules or add a bundler. The only external resource allowed is the pinned supabase-js UMD script in `<head>`. Do not add any other CDN script, stylesheet, or font.
+2. **No dependencies beyond sync.** Vanilla JS only. Network access lives exclusively in the **sync** section and goes through `sb` (the Supabase client). `sb` is `null` on `file://` or when the CDN script did not load, and every feature except sync must work identically in that case. Never make sync a prerequisite for anything.
 3. **Name.** The product is **BrainBop**. Do not reintroduce any prior name anywhere, including in storage keys or comments.
-4. **Storage key.** State is stored under `brainbop_v1`. If you change the state shape in a way that breaks old saves, either migrate in `load()` or bump the key version and say so in the README.
-5. **Preserve saved state on edits.** Adding fields to state is fine if `load()` fills defaults (it merges over `defaultState()`). Never rename or remove existing fields without a migration.
+4. **Storage model.** The source of truth is `L`, stored under `brainbop_v2`: an **append-only log** of immutable records (`L.recs`) plus device prefs. `S` is derived from `L` by `derive()` and is never persisted. To change progress, append a record and call `derive()`; never mutate `S` for persistence and never edit or remove an existing record. There is deliberately no reset feature.
+5. **Records are forever.** Records already written (locally or in the cloud) must keep working. Add new record fields only with defaults in `derive()`. Never rename or reinterpret existing fields.
+6. **v1 is dead.** `load()` performs a one-time migration from `brainbop_v1` only when `brainbop_v2` does not exist. Once v2 exists, v1 is never read or written. Do not add any other code path that touches v1; the migration branch itself can be deleted once it has been deployed for a while.
 
 ## File layout
 
 Everything is in `index.html`, in this order. Section headers in the script are `/* ===== name ===== */` comments; search for them rather than relying on line numbers.
 
 - `<style>` – all CSS. Design tokens are CSS custom properties on `:root`. Game-specific classes are grouped after the shared UI classes.
-- `<body>` – static shell: header (level bar, streak, sound toggle), five `<section class="screen">` containers (`home`, `play`, `result`, `stats`, `badges`), and a fixed bottom `<nav>`.
+- `<body>` – static shell: header (level bar, streak, sound toggle, cloud sync chip), five `<section class="screen">` containers (`home`, `play`, `result`, `stats`, `badges`), and a fixed bottom `<nav>`.
 - `<script>` sections:
   - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`.
   - **sound** – `beep()` and the `sfx` object. Silently no-ops if audio is unavailable or muted.
-  - **state** – `S` (the live state object), `load()`, `save()`, `gs(id)` (get or create a game's stats record), `levelInfo(xp)`.
+  - **state** – `L` (the persisted log), `S` (the derived aggregate), `load()` (with the one-time v1 migration), `save()`, `gs(id)` (get or create a game's stats record in `S`), `streakFrom(days)`, `derive()`, `levelInfo(xp)`.
+  - **sync** – Supabase config, `sb` client, `commit()` (save + header + push), `pushPending()`, `pull()`, `fullSync()`, sign in/out, the sync panel/chip renderers, and `openSyncModal()`.
   - **game registry** – `GAMES` array, `G` map by id, `CATS` category order, `reg()`.
-  - **achievements** – `ACH` definitions and `checkAch(ctx)`.
-  - **daily workout** – `dailyGames()` (date-seeded pick of 3), `dailyState()`.
+  - **achievements** – `ACH` definitions. Unlocking happens in `derive()` and `endGame()`.
+  - **daily workout** – `dailyGames()` (date-seeded pick of 3), `dailyState()` (re-derives if the date rolled over).
   - **brain score** – `recentAvg`, `catScores`, `brainScore`.
   - **screens** – `showScreen`, `renderHeader`, `renderHome`, `renderStats`, `renderBadges`, `spark()`.
   - **game runner** – `startGame`, `makeApi`, `endGame`, `abortGame`, the global keydown dispatcher.
@@ -35,20 +37,64 @@ Everything is in `index.html`, in this order. Section headers in the script are 
 
 ## State shape
 
+Persisted (`L`, key `brainbop_v2`):
+
 ```js
 {
-  xp: 0,
-  games: { [id]: { best, plays, total, diff, hist: [last 40 scores] } },
-  history: [ { d: 'YYYY-MM-DD', g: id, s: score } ],   // capped at 500
-  streak: { count, last: 'YYYY-MM-DD' | null },
-  ach: [ achievementId, ... ],
-  daily: { date: 'YYYY-MM-DD', done: [gameId, ...] },
-  dailyCount: 0,
-  totalPlays: 0,
-  sound: true,
-  days: { 'YYYY-MM-DD': gamesPlayedThatDay }
+  recs:  [ record, ... ],              // append-only, any order; derive() sorts by t
+  sound: true,                         // device preference, never synced
+  sync:  { cursor: isoTimestamp|null,  // created_at of the last pulled cloud row
+           uid: userId|null }          // account this browser's log belongs to
 }
 ```
+
+Record kinds, distinguished by `g`:
+
+```js
+// A play. Written by endGame(), one per finished game.
+{ id: uuid, t: Date.now(), d: 'YYYY-MM-DD', g: gameId, s: score,
+  x: xpAwarded,          // includes the +150 daily bonus when dc is set
+  df: difficultyPlayedAt,
+  dc: 1,                 // only present if this play completed the daily workout
+  a: [achievementId],    // only present if badges unlocked on this play
+  u: 1 }                 // only present while not yet pushed to the cloud; stripped on push
+
+// The legacy baseline. Written once by the v1 migration, never again.
+{ id, t, g: '_base', xp, games, days, ach, dailyCount, totalPlays, u? }
+```
+
+Derived (`S`, rebuilt by `derive()`, same shape the render functions have always used):
+
+```js
+{
+  xp, totalPlays, dailyCount,
+  games: { [id]: { best, plays, total, diff, hist: [last 40 scores] } },
+  history: [ { d, g, s } ],                 // last 500 plays
+  streak: { count, last },                  // walked back from today/yesterday over days
+  ach: [ achievementId, ... ],              // union of record.a, base.ach, and state-based tests
+  daily: { date: today, done: [gameId] },   // today's plays that are in dailyGames()
+  days: { 'YYYY-MM-DD': gamesPlayedThatDay },
+  sound
+}
+```
+
+Folding rules in `derive()`: a play increments `plays/total/best/hist`, adjusts `diff` (≥750 up, <350 down), adds `x` to xp, bumps `totalPlays` and `days[d]`, and bumps `dailyCount` if `dc`. A `_base` adds its totals, unions `ach`, and per game adds `plays/total`, takes max `best`/`diff`, and concatenates `hist`. Because every operation is additive or a max, merging record sets from several devices is just set union by `id`.
+
+Badges: state-based tests (`t.length === 1`) are re-evaluated on every `derive()`; anything that once passed is also pinned via `record.a`, so a badge is never lost when a streak or difficulty later drops. Context-based tests (`nbperf`, `fast`, `span9`) run only in `endGame()` and persist via `record.a`.
+
+## Sync
+
+- `sb` is created at parse time from `SUPA_URL`/`SUPA_KEY` (publishable key, safe to commit). RLS in `supabase/schema.sql` is the security boundary: users can select and insert only their own rows, and nothing can update or delete.
+- Cloud table `recs(user_id, id, t, data jsonb, created_at)`; `data` is the record verbatim minus `u`.
+- `pushPending()` upserts every record with `u` (`onConflict: user_id,id`, `ignoreDuplicates`) in chunks of 500, then strips `u`. Called from `commit()` after every play and at the start of `fullSync()`.
+- `pull()` pages by `created_at >= L.sync.cursor` ordered by `created_at, id`, dedupes by `id`, advances the cursor.
+- `fullSync()` = push, pull, `derive()`, `save()`, re-render the active screen. Runs on sign-in, when the tab becomes visible, and on `online`, throttled to once per 30 s.
+- Signing in with a different account than `L.sync.uid` asks for confirmation and then discards the local log before pulling. Signing out keeps local progress.
+- The sync panel content comes from `syncPanelHtml()` and is shown in two places: at the top of the Stats screen and in a popup opened by the ☁️ header chip (`openSyncModal()`). Both containers carry class `sync-body`; `renderSyncUI()` refreshes all of them. Keep the privacy note ("Only your account ID and game results are stored.").
+- The sign-in button follows Google's branding guidelines (light theme, standard-colour G logo, "Sign in with Google" wording). Do not recolour the logo or reword the button.
+- `.modal-bg`/`.modal` is the only page-level popup pattern. It sits at `z-index:8`, above the nav (5) and below toasts (9). Close on backdrop click, ✕, or Escape.
+
+Setting up a project is described in the README.
 
 ## Game lifecycle
 
@@ -67,7 +113,7 @@ Everything is in `index.html`, in this order. Section headers in the script are 
 | `api.stopwatch()` | Elapsed timer on the right; returns a function giving elapsed seconds. |
 | `api.finish(score, detailsArray, extra)` | Ends the game. `details` are short strings shown as tags. `extra` is passed to achievement checks. |
 
-`endGame` does the rest: updates per-game stats, adjusts difficulty (≥750 up, <350 down), awards XP, updates streak, daily workout, activity days, checks achievements, saves, and renders the result screen. Games never touch `S` directly.
+`endGame` does the rest: computes XP and daily-workout completion from the current derived `S`, appends one play record to `L.recs`, calls `derive()`, works out which badges just unlocked (and pins them on the record), calls `commit()` (save, header, push), and renders the result screen. Games never touch `S` or `L` directly.
 
 ## Adding a game
 
@@ -83,7 +129,7 @@ Game ids currently in use: `match`, `simon`, `grid`, `digits`, `nback`, `stroop`
 
 ## Adding an achievement
 
-Append to `ACH`: `{ id, ico, nm, ds, t: (state, ctx) => boolean }`. `ctx` is `{ id, score, extra }` from the game that just finished, or `undefined`. Badges are checked after every game and unlock permanently. Keep `id` stable.
+Append to `ACH`: `{ id, ico, nm, ds, t: (state, ctx) => boolean }`. Declare the `ctx` parameter **only** if the test needs it: `derive()` uses `t.length` to tell state-based tests (re-run on every derive) from context-based ones (run once in `endGame()` with `{ id, score, extra }`). Unlocks are pinned on the play record, so they are permanent. Keep `id` stable.
 
 ## Conventions
 
@@ -100,8 +146,10 @@ There is no test suite. Verify changes by loading the page in a browser and exer
 1. Serve the directory (`python3 -m http.server 8765`) because headless tools often block `file://`.
 2. Load the page and check the console for errors.
 3. For every game, run `startGame(id)`, click `#go-btn`, wait about a second, and confirm `#arena` has children and `#hud-l` has text. All registry symbols (`GAMES`, `G`, `startGame`, `current`, `S`) are global and reachable from `page.evaluate`.
-4. Play at least one game to completion programmatically (Memory Match and Number Hunt are easy to solve by reading the DOM) and confirm the result screen shows and `localStorage` updated.
+4. Play at least one game to completion programmatically (Memory Match and Number Hunt are easy to solve by reading the DOM) and confirm the result screen shows and a new record was appended to `JSON.parse(localStorage.brainbop_v2).recs`.
 5. Regression check for the timer bug: start Math Sprint, submit several answers with Enter, and confirm `current.timers.length` stays at 1 and the countdown text decreases monotonically.
+6. Migration: seed `localStorage.brainbop_v1` with a v1 object, remove `brainbop_v2`, reload, and confirm `S` matches the seed and `recs` holds one `_base` record. Then change `brainbop_v1` and reload: nothing changes.
+7. Sync needs a real Google sign-in and cannot be automated headlessly. Check the Stats panel and the ☁️ popup render the sign-in button over http and the "unavailable" text over `file://`, and that `pushPending()`/`fullSync()` no-op without errors when signed out.
 
 A quick syntax check without a browser:
 
@@ -113,6 +161,8 @@ node -e "const fs=require('fs');const js=fs.readFileSync('index.html','utf8').sp
 
 - The overlay Start handler must be cleared once the game begins (see Game lifecycle). Any game that uses a text input and does not call `api.onKey` depends on this.
 - `api.countdown` and `api.stopwatch` both write to `#hud-r`. Use one per game.
-- `gs(id)` creates a stats record on first access, including when a game is merely opened. UI code must check `plays > 0` before showing a best score, otherwise unplayed games show 0.
+- `gs(id)` creates a stats record in `S` on first access, including when a game is merely opened. UI code must check `plays > 0` before showing a best score, otherwise unplayed games show 0. Such entries are transient; `derive()` rebuilds `S` from records only.
+- `derive()` is called at boot, after `ACH`, `GAMES`, and `dailyGames()` exist. Do not call it (or anything reading `S`) at parse time before the boot line.
+- `S` is replaced wholesale by `derive()`. Never keep a reference to `S` or a sub-object across a `derive()` call; re-read it (e.g. `gs(id)` again) as `endGame()` does.
 - Web Audio needs a user gesture before it can play. The first `beep()` happens after a click, so this is fine, but do not add sounds on page load.
 - The full-page layout has a fixed bottom nav. Keep `padding-bottom` on `.app` large enough that content is not hidden behind it.

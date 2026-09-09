@@ -4,10 +4,14 @@ import * as path from 'path';
 
 const COVERAGE_DIR = path.join(__dirname, '..', '.v8-coverage');
 
-// The only external resource the app loads. Tests never hit the network: the fixture
-// answers this URL with an in-page stub that mimics the small slice of supabase-js the
-// app uses, and records everything the app does with it on window.__cloud.
+// The external scripts the app loads. Tests never hit the network: the fixture answers
+// the supabase-js URL with an in-page stub that mimics the small slice of the library the
+// app uses (recording everything on window.__cloud), and the confetti.js URL with a stub
+// that records every confetti() call's config on window.__confetti.
 export const SUPA_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@**';
+export const CONFETTI_CDN = 'https://cdn.jsdelivr.net/npm/@hiseb/confetti@**';
+
+const CONFETTI_STUB = `window.__confetti = []; window.confetti = cfg => { window.__confetti.push(cfg) };`;
 
 const SUPABASE_STUB = `(() => {
   const cloud = window.__cloud = { rows: [], upserts: [], selects: 0, signOuts: 0, oauth: null,
@@ -67,6 +71,7 @@ export const test = base.extend<Fixtures>({
   page: async ({ page, pageErrors }, use, testInfo) => {
     page.on('pageerror', e => pageErrors.push(e));
     await page.route(SUPA_CDN, route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
+    await page.route(CONFETTI_CDN, route => route.fulfill({ contentType: 'application/javascript', body: CONFETTI_STUB }));
     await page.coverage.startJSCoverage({ resetOnNavigation: false });
 
     await use(page);
@@ -128,6 +133,9 @@ export async function startAndGo(page: Page, id: string) {
 /** Finish the current game through the same path a game's api.finish() takes. */
 export const finishGame = (page: Page, id: string, score: number, details: string[] = [], extra: Rec = {}) =>
   page.evaluate(([id, score, details, extra]) => endGame(id, score, details as string[], extra), [id, score, details, extra] as const);
+
+/** The configs passed to confetti() so far (recorded by the fixture's stub). */
+export const readConfetti = (page: Page): Promise<Rec[]> => page.evaluate(() => (window as any).__confetti ?? []);
 
 /** Read the runner's `current` bookkeeping. */
 export const readCurrent = (page: Page): Promise<null | { id: string; timers: number; done: boolean; started: boolean; hasKey: boolean }> =>

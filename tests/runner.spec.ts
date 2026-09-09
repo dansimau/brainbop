@@ -1,4 +1,4 @@
-import { test, expect, play, seedLog, readLog, readS, localDates, startAndGo, finishGame, readCurrent } from './fixtures';
+import { test, expect, play, seedLog, readLog, readS, localDates, startAndGo, finishGame, readCurrent, readConfetti, CONFETTI_CDN } from './fixtures';
 
 test.describe('Intro overlay', () => {
   test('shows the game info and focuses Start', async ({ page }) => {
@@ -390,5 +390,63 @@ test.describe('Badges on finish', () => {
     await startAndGo(page, 'rotate');
     await finishGame(page, 'rotate', 100);
     await expect(page.locator('#result')).toContainText('Badge unlocked: Explorer');
+  });
+});
+
+test.describe('Confetti', () => {
+  const bursts = (page: Parameters<typeof readConfetti>[0]) => expect.poll(() => readConfetti(page).then(c => c.length));
+
+  test('fires on a level up', async ({ page }) => {
+    await seedLog(page, [play('match', 500)]); // 50 XP, First Rep already earned
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 600); // +60 XP crosses 100 → level 2, no new badge
+    const r = page.locator('#result');
+    await expect(r.locator('.unlock', { hasText: 'Level up!' })).toBeVisible();
+    await expect(r.locator('.unlock', { hasText: 'Badge unlocked' })).toHaveCount(0);
+    await bursts(page).toBe(3);
+    const cfg = (await readConfetti(page))[0];
+    expect(cfg.count).toBe(90);
+    expect(cfg.color).toEqual(['#6c8cff', '#ff7ab6', '#3ddc97', '#ffc857']);
+    expect(cfg.position.x).toBeGreaterThan(0);
+    expect(cfg.position.y).toBeGreaterThan(0);
+  });
+
+  test('fires on a new badge', async ({ page }) => {
+    await seedLog(page, Array.from({ length: 9 }, () => play('match', 100, { x: 0 })));
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 100); // 10 XP total: no level up, but Warming Up unlocks
+    const r = page.locator('#result');
+    await expect(r.locator('.unlock', { hasText: 'Badge unlocked: Warming Up' })).toBeVisible();
+    await expect(r.locator('.unlock', { hasText: 'Level up!' })).toHaveCount(0);
+    await bursts(page).toBe(3);
+  });
+
+  test('stays quiet on an ordinary play', async ({ page }) => {
+    await seedLog(page, [play('match', 500)]);
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 100); // 60 XP total, nothing new
+    await expect(page.locator('#result .unlock')).toHaveCount(0);
+    await page.waitForTimeout(600);
+    expect(await readConfetti(page)).toEqual([]);
+  });
+
+  test('respects prefers-reduced-motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 800);
+    await expect(page.locator('#result .unlock', { hasText: 'Level up!' })).toBeVisible();
+    await page.waitForTimeout(600);
+    expect(await readConfetti(page)).toEqual([]);
+  });
+
+  test('degrades gracefully when the CDN script is unavailable', async ({ page }) => {
+    await page.route(CONFETTI_CDN, r => r.abort());
+    await page.goto('/');
+    expect(await page.evaluate(() => typeof (window as any).confetti)).toBe('undefined');
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 800);
+    await expect(page.locator('#result .unlock', { hasText: 'Level up!' })).toBeVisible();
+    await expect(page.locator('#result .unlock', { hasText: 'Badge unlocked: First Rep' })).toBeVisible();
   });
 });

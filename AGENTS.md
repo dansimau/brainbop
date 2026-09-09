@@ -4,12 +4,12 @@ Guidance for AI coding agents and contributors working on BrainBop.
 
 ## What this is
 
-A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager. The one external resource is the supabase-js script used for optional cloud sync. That constraint is deliberate. Keep it.
+A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager. The only external resources are a couple of pinned CDN scripts (supabase-js for optional cloud sync, confetti.js for celebrations), and the app must keep working when they fail to load. That constraint is deliberate. Keep it.
 
 ## Hard rules
 
-1. **Single file.** All markup, styles, and script stay in `index.html`. Do not split into modules or add a bundler. The only external resource allowed is the pinned supabase-js UMD script in `<head>`. Do not add any other CDN script, stylesheet, or font.
-2. **No dependencies beyond sync.** Vanilla JS only. Network access lives exclusively in the **sync** section and goes through `sb` (the Supabase client). `sb` is `null` on `file://` or when the CDN script did not load, and every feature except sync must work identically in that case. Never make sync a prerequisite for anything.
+1. **Single file, no build step.** All markup, styles, and script stay in `index.html`. Do not split into modules, add a bundler, or add npm runtime dependencies. Third-party code may be loaded only as a pinned, versioned UMD `<script>` from a CDN in `<head>` (currently supabase-js and `@hiseb/confetti`). Keep the list short and add to it only for something the app genuinely cannot do itself in a few lines.
+2. **Degrade gracefully.** Vanilla JS only. Every CDN script is optional: the app must load and every core feature (playing games, XP, badges, stats, local storage) must work identically when a script is blocked, offline, or opened from `file://`. Guard each use (`sb` is `null` when supabase-js is missing; `celebrate()` checks `typeof confetti==='function'`) and fail silently rather than throwing. Network access for data lives exclusively in the **sync** section and goes through `sb`. Never make sync a prerequisite for anything.
 3. **Name.** The product is **BrainBop**. Do not reintroduce any prior name anywhere, including in storage keys or comments.
 4. **Storage model.** The source of truth is `L`, stored under `brainbop_v2`: an **append-only log** of immutable records (`L.recs`) plus device prefs. `S` is derived from `L` by `derive()` and is never persisted. To change progress, append a record and call `derive()`; never mutate `S` for persistence and never edit or remove an existing record. There is deliberately no reset feature.
 5. **Records are forever.** Records already written (locally or in the cloud) must keep working. Add new record fields only with defaults in `derive()`. Never rename or reinterpret existing fields.
@@ -22,7 +22,7 @@ Everything is in `index.html`, in this order. Section headers in the script are 
 - `<style>` – all CSS. Design tokens are CSS custom properties on `:root`. Game-specific classes are grouped after the shared UI classes.
 - `<body>` – static shell: header (level bar, streak, sound toggle, cloud sync chip), five `<section class="screen">` containers (`home`, `play`, `result`, `stats`, `badges`), and a fixed bottom `<nav>`.
 - `<script>` sections:
-  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`.
+  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`, `celebrate()` (confetti; no-op without the CDN script or under `prefers-reduced-motion`).
   - **sound** – `beep()` and the `sfx` object. Silently no-ops if audio is unavailable or muted.
   - **state** – `L` (the persisted log), `S` (the derived aggregate), `load()` (with the one-time v1 migration), `save()`, `gs(id)` (get or create a game's stats record in `S`), `streakFrom(days)`, `derive()`, `levelInfo(xp)`.
   - **sync** – Supabase config, `sb` client, `commit()` (save + header + push), `pushPending()`, `pull()`, `fullSync()`, sign in/out, the sync panel/chip renderers, and `openSyncModal()`.
@@ -92,7 +92,7 @@ Badges: state-based tests (`t.length === 1`) are re-evaluated on every `derive()
 - Signing in with a different account than `L.sync.uid` asks for confirmation and then discards the local log before pulling. Signing out keeps local progress.
 - The sync panel content comes from `syncPanelHtml()` and is shown in two places: at the top of the Stats screen and in a popup opened by the ☁️ header chip (`openSyncModal()`). Both containers carry class `sync-body`; `renderSyncUI()` refreshes all of them. Keep the privacy note ("Only your account ID and game results are stored.").
 - The sign-in button follows Google's branding guidelines (light theme, standard-colour G logo, "Sign in with Google" wording). Do not recolour the logo or reword the button.
-- `.modal-bg`/`.modal` is the only page-level popup pattern. It sits at `z-index:8`, above the nav (5) and below toasts (9). Close on backdrop click, ✕, or Escape.
+- `.modal-bg`/`.modal` is the only page-level popup pattern. It sits at `z-index:8`, above the nav (5) and below toasts (9). Close on backdrop click, ✕, or Escape. (confetti.js draws on its own fixed, pointer-events-none canvas above everything; it never blocks input.)
 
 Setting up a project is described in the README.
 
@@ -113,7 +113,7 @@ Setting up a project is described in the README.
 | `api.stopwatch()` | Elapsed timer on the right; returns a function giving elapsed seconds. |
 | `api.finish(score, detailsArray, extra)` | Ends the game. `details` are short strings shown as tags. `extra` is passed to achievement checks. |
 
-`endGame` does the rest: computes XP and daily-workout completion from the current derived `S`, appends one play record to `L.recs`, calls `derive()`, works out which badges just unlocked (and pins them on the record), calls `commit()` (save, header, push), and renders the result screen. Games never touch `S` or `L` directly.
+`endGame` does the rest: computes XP and daily-workout completion from the current derived `S`, appends one play record to `L.recs`, calls `derive()`, works out which badges just unlocked (and pins them on the record), calls `commit()` (save, header, push), renders the result screen, and fires `celebrate()` if the play levelled up or unlocked a badge. Games never touch `S` or `L` directly.
 
 ## Adding a game
 
@@ -141,7 +141,7 @@ Append to `ACH`: `{ id, ico, nm, ds, t: (state, ctx) => boolean }`. Declare the 
 
 ## Testing
 
-Playwright end-to-end tests live in `tests/`. They run against `index.html` served over http and never touch the network: the fixture in `tests/fixtures.ts` answers the supabase-js CDN URL with an in-page stub that records everything the app does with it on `window.__cloud`.
+Playwright end-to-end tests live in `tests/`. They run against `index.html` served over http and never touch the network: the fixture in `tests/fixtures.ts` answers the supabase-js CDN URL with an in-page stub that records everything the app does with it on `window.__cloud`, and the confetti.js CDN URL with a stub that records each `confetti()` call on `window.__confetti`. Any new CDN script needs a stub route there too.
 
 ```bash
 npm install                  # once; then: npx playwright install chromium
@@ -153,7 +153,7 @@ npx playwright test tests/games/math.spec.ts
 
 Layout:
 
-- `tests/fixtures.ts` – the `test` export (coverage collection, Supabase stub route, fails a test if the page throws) and shared helpers: `seedLog(page, recs)` writes a `brainbop_v2` log and reloads, `play(g, s, extra)` builds a play record, `startAndGo(page, id)` opens a game and presses Start, `finishGame(page, id, score, details, extra)` calls `endGame` the way `api.finish` does, `readLog`/`readS`/`readCurrent` read `L`/`S`/`current`, `localDates([0, -1])` gives local date strings.
+- `tests/fixtures.ts` – the `test` export (coverage collection, Supabase and confetti stub routes, fails a test if the page throws) and shared helpers: `seedLog(page, recs)` writes a `brainbop_v2` log and reloads, `play(g, s, extra)` builds a play record, `startAndGo(page, id)` opens a game and presses Start, `finishGame(page, id, score, details, extra)` calls `endGame` the way `api.finish` does, `readLog`/`readS`/`readCurrent` read `L`/`S`/`current`, `localDates([0, -1])` gives local date strings.
 - `tests/app-globals.d.ts` – ambient declarations for the app's top-level bindings. They are `const`/`let` in a classic script, so inside `page.evaluate` use them as bare identifiers (`S`, `L`, `startGame(id)`), never `window.S`.
 - `tests/utilities.spec.ts`, `state.spec.ts`, `registry.spec.ts`, `screens.spec.ts`, `runner.spec.ts`, `sync.spec.ts` – one file per script section.
 - `tests/games/<id>.spec.ts` – one file per game, plus `smoke.spec.ts` which opens, starts and quits every game.
@@ -162,7 +162,7 @@ Conventions that keep the suite deterministic:
 
 - Countdown and multi-round games use `page.clock.install()` before `page.goto` and then `page.clock.fastForward(...)`/`runFor(...)`. After `install()` the fake clock still ticks with real time, so normal waits keep working.
 - Random content is solved from the DOM (Memory Match faces, Schulte numbers, Stroop ink colours, word lists via the `WORDS`/`CATEGORIES` globals) rather than guessed. Where a fixed sequence is needed, pin `Math.random` after `startGame(id)` and before clicking Start, e.g. `page.evaluate(() => { startGame('simon'); Math.random = () => 0 })`.
-- Sync tests simulate sign-in with `window.__signIn(userId)`, seed the fake table via `window.__cloud.rows`, and flip `window.__cloud.failUpsert`/`failSelect` for error paths. Blocking the CDN with `page.route(SUPA_CDN, r => r.abort())` exercises the `sb === null` path.
+- Sync tests simulate sign-in with `window.__signIn(userId)`, seed the fake table via `window.__cloud.rows`, and flip `window.__cloud.failUpsert`/`failSelect` for error paths. Blocking a CDN with `page.route(SUPA_CDN, r => r.abort())` (or `CONFETTI_CDN`) exercises the script-missing path.
 - Records seeded without `u: 1` count as already synced.
 
 When adding a feature or fixing a bug, add or extend a test in the matching file and run `npm test`. Real Google sign-in cannot be automated; everything else can.

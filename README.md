@@ -8,6 +8,20 @@ A brain training web app in a single HTML file. Fourteen short games across memo
 
 **URL:** https://dansimau.github.io/brainbop/
 
+## Features
+
+- 🧠 **Fourteen games** across memory, attention, speed, math, language and logic, each scored on a nominal 0 to 1000 scale.
+- 📈 **Adaptive difficulty.** Every game has its own level from 1 to 10. Score 750 or more to move up, under 350 to drop down.
+- ⭐ **XP and levels.** Each play earns XP scaled by difficulty, with bonuses for personal bests and first plays.
+- 📅 **Daily workout.** Three games chosen each day, the same for everyone on that date. Complete all three for a 150 XP bonus.
+- 🔥 **Streaks.** Counts consecutive days with at least one game played.
+- 🎯 **Brain Score.** Your recent form in each category, averaged into one number with per-category bars on the home screen.
+- 🏅 **Badges.** 22 achievements for play counts, levels, streaks, daily workouts, high scores and game-specific feats.
+- 📊 **Stats.** Totals, a 12-week activity heatmap and per-game sparklines of recent scores.
+- 💾 **Local progress.** Saved in the browser as an append-only log of plays. Nothing is edited or deleted, so progress is never lost to a stray tap.
+- ☁️ **Cloud sync.** Optionally sign in with Google to back the log up to Supabase and sync across devices. Only your account ID and game results are stored.
+- 📄 **Single HTML file.** No build step or dependencies. Works opened straight from disk (sync needs http(s)).
+
 ## Games
 
 | Category  | Game            | What you do                                                                 |
@@ -26,26 +40,6 @@ A brain training web app in a single HTML file. Fourteen short games across memo
 | Language  | Odd Word Out    | Spot the word that doesn't belong in the group.                             |
 | Logic     | Pattern Finder  | Work out the rule behind a number sequence and pick what comes next.        |
 | Logic     | Shape Shift     | Is the second shape a rotation of the first, or a mirror image?             |
-
-## Scoring and progression
-
-- **Score.** Every game reports a score on a nominal 0 to 1000 scale, along with details such as accuracy or time. Some games can exceed 1000 on exceptional runs.
-- **Adaptive difficulty.** Each game has its own difficulty from 1 to 10. Scoring 750 or more raises it by one. Scoring under 350 lowers it by one. Harder levels change the task (more cards, longer sequences, bigger numbers, tighter timing).
-- **XP and levels.** XP earned per game is roughly score divided by 10, scaled up by 15% per difficulty level above 1. Personal bests and first plays add a bonus. Levels follow a growing curve, so each one takes a bit longer than the last.
-- **Daily workout.** Three games chosen each day, the same for everyone on that date. Completing all three earns a 150 XP bonus.
-- **Streak.** Counts consecutive days with at least one game played.
-- **Brain Score.** The average of your recent form (last five scores) in each category, then averaged across categories. Shown on the home screen with per-category bars.
-- **Badges.** 22 achievements for milestones like play counts, levels, streaks, daily workouts, high scores, and a few game-specific feats.
-
-The Stats tab shows the cloud sync controls, totals, a 12-week activity heatmap, and per-game sparklines of recent scores.
-
-## Progress and sync
-
-Progress is saved in the browser's localStorage as an append-only log of plays. Stats, levels, streaks and badges are all computed from that log. Nothing is ever edited or deleted, and there is no reset.
-
-Optionally, tap the ☁️ button in the header (or the Cloud sync panel on the Stats tab) and **Sign in with Google** to back the log up to the cloud (Supabase). Once signed in, every play is pushed as it happens and plays from your other devices are pulled in, so clearing the browser or switching devices no longer loses progress. Only your account ID and game results are stored. Sync is only available when the page is served over http(s); opened from disk, the app works exactly as before without it.
-
-The storage key is `brainbop_v2`. Progress saved by earlier versions under `brainbop_v1` is migrated automatically the first time the new version loads.
 
 ## Development
 

@@ -1,10 +1,12 @@
 # BrainBop
 
+![Checks](https://github.com/dansimau/brainbop/actions/workflows/checks.yaml/badge.svg)
+![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/dansimau/brainbop/badges/coverage.json)
 [![Coded with Claude Code](https://vibecoded.fyi/badges/flat/agents/claude-code.svg)](https://vibecoded.fyi/)
 
 A brain training web app in a single HTML file. Fourteen short games across memory, attention, speed, math, language, and logic, with adaptive difficulty, XP and levels, daily workouts, streaks, and badges to track progress over time.
 
-https://dansimau.github.io/brainbop/
+**URL:** https://dansimau.github.io/brainbop/
 
 ## Games
 
@@ -44,6 +46,18 @@ Progress is saved in the browser's localStorage as an append-only log of plays. 
 Optionally, tap the ☁️ button in the header (or the Cloud sync panel on the Stats tab) and **Sign in with Google** to back the log up to the cloud (Supabase). Once signed in, every play is pushed as it happens and plays from your other devices are pulled in, so clearing the browser or switching devices no longer loses progress. Only your account ID and game results are stored. Sync is only available when the page is served over http(s); opened from disk, the app works exactly as before without it.
 
 The storage key is `brainbop_v2`. Progress saved by earlier versions under `brainbop_v1` is migrated automatically the first time the new version loads.
+
+## Development
+
+There is no build step. Serve the directory and open it in a browser:
+
+```bash
+npm install
+npm run serve    # http://localhost:8765
+npm test         # Playwright end-to-end tests (auto-starts a server) + coverage report
+```
+
+Tests live in `tests/`; see `AGENTS.md` for the layout and conventions.
 
 ### Setting up your own Supabase project
 

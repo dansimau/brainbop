@@ -1,0 +1,20 @@
+{
+  "name": "brainbop",
+  "version": "1.0.0",
+  "description": "BrainBop - brain training web app in a single HTML file",
+  "private": true,
+  "scripts": {
+    "test": "PORT=$(node scripts/get-free-port.mjs) playwright test && node scripts/report-coverage.mjs",
+    "test:ui": "PORT=$(node scripts/get-free-port.mjs) playwright test --ui",
+    "test:headed": "PORT=$(node scripts/get-free-port.mjs) playwright test --headed",
+    "serve": "serve -l 8765 -s ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "istanbul-lib-coverage": "^3.2.2",
+    "istanbul-lib-report": "^3.0.1",
+    "istanbul-reports": "^3.1.7",
+    "serve": "^14.2.0",
+    "v8-to-istanbul": "^9.3.0"
+  }
+}

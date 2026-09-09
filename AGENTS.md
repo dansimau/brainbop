@@ -141,21 +141,31 @@ Append to `ACH`: `{ id, ico, nm, ds, t: (state, ctx) => boolean }`. Declare the 
 
 ## Testing
 
-There is no test suite. Verify changes by loading the page in a browser and exercising the flow. When a headless browser is available, the pattern that has worked:
+Playwright end-to-end tests live in `tests/`. They run against `index.html` served over http and never touch the network: the fixture in `tests/fixtures.ts` answers the supabase-js CDN URL with an in-page stub that records everything the app does with it on `window.__cloud`.
 
-1. Serve the directory (`python3 -m http.server 8765`) because headless tools often block `file://`.
-2. Load the page and check the console for errors.
-3. For every game, run `startGame(id)`, click `#go-btn`, wait about a second, and confirm `#arena` has children and `#hud-l` has text. All registry symbols (`GAMES`, `G`, `startGame`, `current`, `S`) are global and reachable from `page.evaluate`.
-4. Play at least one game to completion programmatically (Memory Match and Number Hunt are easy to solve by reading the DOM) and confirm the result screen shows and a new record was appended to `JSON.parse(localStorage.brainbop_v2).recs`.
-5. Regression check for the timer bug: start Math Sprint, submit several answers with Enter, and confirm `current.timers.length` stays at 1 and the countdown text decreases monotonically.
-6. Migration: seed `localStorage.brainbop_v1` with a v1 object, remove `brainbop_v2`, reload, and confirm `S` matches the seed and `recs` holds one `_base` record. Then change `brainbop_v1` and reload: nothing changes.
-7. Sync needs a real Google sign-in and cannot be automated headlessly. Check the Stats panel and the ☁️ popup render the sign-in button over http and the "unavailable" text over `file://`, and that `pushPending()`/`fullSync()` no-op without errors when signed out.
-
-A quick syntax check without a browser:
-
-```sh
-node -e "const fs=require('fs');const js=fs.readFileSync('index.html','utf8').split('<script>')[1].split('</script>')[0];new Function(js);console.log('ok')"
+```bash
+npm install                  # once; then: npx playwright install chromium
+npm test                     # full suite + coverage report in coverage/
+npm run test:ui              # interactive Playwright UI
+npx playwright test -g "name"   # a single test by name
+npx playwright test tests/games/math.spec.ts
 ```
+
+Layout:
+
+- `tests/fixtures.ts` – the `test` export (coverage collection, Supabase stub route, fails a test if the page throws) and shared helpers: `seedLog(page, recs)` writes a `brainbop_v2` log and reloads, `play(g, s, extra)` builds a play record, `startAndGo(page, id)` opens a game and presses Start, `finishGame(page, id, score, details, extra)` calls `endGame` the way `api.finish` does, `readLog`/`readS`/`readCurrent` read `L`/`S`/`current`, `localDates([0, -1])` gives local date strings.
+- `tests/app-globals.d.ts` – ambient declarations for the app's top-level bindings. They are `const`/`let` in a classic script, so inside `page.evaluate` use them as bare identifiers (`S`, `L`, `startGame(id)`), never `window.S`.
+- `tests/utilities.spec.ts`, `state.spec.ts`, `registry.spec.ts`, `screens.spec.ts`, `runner.spec.ts`, `sync.spec.ts` – one file per script section.
+- `tests/games/<id>.spec.ts` – one file per game, plus `smoke.spec.ts` which opens, starts and quits every game.
+
+Conventions that keep the suite deterministic:
+
+- Countdown and multi-round games use `page.clock.install()` before `page.goto` and then `page.clock.fastForward(...)`/`runFor(...)`. After `install()` the fake clock still ticks with real time, so normal waits keep working.
+- Random content is solved from the DOM (Memory Match faces, Schulte numbers, Stroop ink colours, word lists via the `WORDS`/`CATEGORIES` globals) rather than guessed. Where a fixed sequence is needed, pin `Math.random` after `startGame(id)` and before clicking Start, e.g. `page.evaluate(() => { startGame('simon'); Math.random = () => 0 })`.
+- Sync tests simulate sign-in with `window.__signIn(userId)`, seed the fake table via `window.__cloud.rows`, and flip `window.__cloud.failUpsert`/`failSelect` for error paths. Blocking the CDN with `page.route(SUPA_CDN, r => r.abort())` exercises the `sb === null` path.
+- Records seeded without `u: 1` count as already synced.
+
+When adding a feature or fixing a bug, add or extend a test in the matching file and run `npm test`. Real Google sign-in cannot be automated; everything else can.
 
 ## Known gotchas
 

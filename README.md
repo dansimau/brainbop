@@ -20,7 +20,7 @@ A brain training web app in a single HTML file. Fourteen short games across memo
 - 📊 **Stats.** Totals, a 12-week activity heatmap and per-game sparklines of recent scores.
 - 💾 **Local progress.** Saved in the browser as an append-only log of plays. Nothing is edited or deleted, so progress is never lost to a stray tap.
 - ☁️ **Cloud sync.** Optionally sign in with Google to back the log up to Supabase and sync across devices. Only your account ID and game results are stored.
-- 🎉 **Confetti.** Level-ups and new badges get a burst of [confetti.js](https://confettijs.org/).
+- 🎉 **Confetti.** Level-ups and new badges get a burst of [confetti.js](https://confettijs.org/), each with a fireworks bang (muted along with the other sounds).
 - 📄 **Single HTML file.** No build step. Works opened straight from disk; only sync (needs http(s)) and confetti (needs the CDN) degrade when offline.
 
 ## Games

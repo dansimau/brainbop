@@ -7,11 +7,15 @@ const COVERAGE_DIR = path.join(__dirname, '..', '.v8-coverage');
 // The external scripts the app loads. Tests never hit the network: the fixture answers
 // the supabase-js URL with an in-page stub that mimics the small slice of the library the
 // app uses (recording everything on window.__cloud), and the confetti.js URL with a stub
-// that records every confetti() call's config on window.__confetti.
+// that records every confetti() call's config on window.__confetti. An init script also replaces
+// Audio with a stub that records each element (src, volume, play count) on window.__audio, so the
+// fireworks bangs never reach a real audio device.
 export const SUPA_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@**';
 export const CONFETTI_CDN = 'https://cdn.jsdelivr.net/npm/@hiseb/confetti@**';
 
 const CONFETTI_STUB = `window.__confetti = []; window.confetti = cfg => { window.__confetti.push(cfg) };`;
+
+const AUDIO_STUB = `window.__audio = []; window.Audio = class { constructor(src) { this.src = src; this.volume = 1; this.played = 0; window.__audio.push(this) } play() { this.played++; return Promise.resolve() } };`;
 
 const SUPABASE_STUB = `(() => {
   const cloud = window.__cloud = { rows: [], upserts: [], selects: 0, signOuts: 0, oauth: null,
@@ -72,6 +76,7 @@ export const test = base.extend<Fixtures>({
     page.on('pageerror', e => pageErrors.push(e));
     await page.route(SUPA_CDN, route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
     await page.route(CONFETTI_CDN, route => route.fulfill({ contentType: 'application/javascript', body: CONFETTI_STUB }));
+    await page.addInitScript(AUDIO_STUB);
     await page.coverage.startJSCoverage({ resetOnNavigation: false });
 
     await use(page);
@@ -136,6 +141,9 @@ export const finishGame = (page: Page, id: string, score: number, details: strin
 
 /** The configs passed to confetti() so far (recorded by the fixture's stub). */
 export const readConfetti = (page: Page): Promise<Rec[]> => page.evaluate(() => (window as any).__confetti ?? []);
+/** Every Audio element the app created so far (recorded by the fixture's stub): { src, volume, played }. */
+export const readAudio = (page: Page): Promise<{ src: string; volume: number; played: number }[]> =>
+  page.evaluate(() => ((window as any).__audio ?? []).map((a: any) => ({ src: a.src, volume: a.volume, played: a.played })));
 
 /** Read the runner's `current` bookkeeping. */
 export const readCurrent = (page: Page): Promise<null | { id: string; timers: number; done: boolean; started: boolean; hasKey: boolean }> =>

@@ -4,7 +4,7 @@ Guidance for AI coding agents and contributors working on BrainBop.
 
 ## What this is
 
-A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager. The only external resources are a couple of pinned CDN scripts (supabase-js for optional cloud sync, confetti.js for celebrations), and the app must keep working when they fail to load. That constraint is deliberate. Keep it.
+A brain training web app delivered as **one self-contained file**, `index.html`. Plain HTML, CSS, and vanilla JavaScript. No framework, no build step, no package manager. The only external resources are a couple of pinned CDN scripts (supabase-js for optional cloud sync, confetti.js for celebrations) and the two fireworks clips in `sounds/`, and the app must keep working when any of them fail to load. That constraint is deliberate. Keep it.
 
 ## Hard rules
 
@@ -22,8 +22,8 @@ Everything is in `index.html`, in this order. Section headers in the script are 
 - `<style>` – all CSS. Design tokens are CSS custom properties on `:root`. Game-specific classes are grouped after the shared UI classes.
 - `<body>` – static shell: header (level bar, streak, sound toggle, cloud sync chip), five `<section class="screen">` containers (`home`, `play`, `result`, `stats`, `badges`), and a fixed bottom `<nav>`.
 - `<script>` sections:
-  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`, `celebrate()` (confetti; no-op without the CDN script or under `prefers-reduced-motion`). `celebrate()` also arms `tapConfetti`: a document click listener then fires a `burst()` at any tap outside a control (`button`, `a`, form fields, `nav`, `.modal-bg`) until `showScreen()` disarms it.
-  - **sound** – `beep()` and the `sfx` object. Silently no-ops if audio is unavailable or muted.
+  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`, `celebrate()` (confetti; no-op without the CDN script or under `prefers-reduced-motion`). Each `burst()` also calls `bang()` from the sound section. `celebrate()` also arms `tapConfetti`: a document click listener then fires a `burst()` at any tap outside a control (`button`, `a`, form fields, `nav`, `.modal-bg`) until `showScreen()` disarms it.
+  - **sound** – `beep()`, the `sfx` object, and `bang()`, which plays one of the two fireworks files in `sounds/` (`BANGS`) at random via a fresh `Audio` element per call. All silently no-op if audio is unavailable or muted.
   - **state** – `L` (the persisted log), `S` (the derived aggregate), `load()` (with the one-time v1 migration), `save()`, `gs(id)` (get or create a game's stats record in `S`), `streakFrom(days)`, `derive()`, `levelInfo(xp)`.
   - **sync** – Supabase config, `sb` client, `commit()` (save + header + push), `pushPending()`, `pull()`, `fullSync()`, sign in/out, the sync panel/chip renderers, and `openSyncModal()`.
   - **game registry** – `GAMES` array, `G` map by id, `CATS` category order, `reg()`.
@@ -141,7 +141,7 @@ Append to `ACH`: `{ id, ico, nm, ds, t: (state, ctx) => boolean }`. Declare the 
 
 ## Testing
 
-Playwright end-to-end tests live in `tests/`. They run against `index.html` served over http and never touch the network: the fixture in `tests/fixtures.ts` answers the supabase-js CDN URL with an in-page stub that records everything the app does with it on `window.__cloud`, and the confetti.js CDN URL with a stub that records each `confetti()` call on `window.__confetti`. Any new CDN script needs a stub route there too.
+Playwright end-to-end tests live in `tests/`. They run against `index.html` served over http and never touch the network: the fixture in `tests/fixtures.ts` answers the supabase-js CDN URL with an in-page stub that records everything the app does with it on `window.__cloud`, and the confetti.js CDN URL with a stub that records each `confetti()` call on `window.__confetti`. An init script replaces `Audio` with a stub that records each element's `src`, `volume` and play count on `window.__audio` (read with `readAudio(page)`), so the fireworks bangs never reach a real audio device. Any new CDN script needs a stub route there too.
 
 ```bash
 npm install                  # once; then: npx playwright install chromium

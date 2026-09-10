@@ -1,4 +1,4 @@
-import { test, expect, play, seedLog, readLog, readS, localDates, startAndGo, finishGame, readCurrent, readConfetti, CONFETTI_CDN } from './fixtures';
+import { test, expect, play, seedLog, readLog, readS, localDates, startAndGo, finishGame, readCurrent, readConfetti, readAudio, CONFETTI_CDN } from './fixtures';
 
 test.describe('Intro overlay', () => {
   test('shows the game info and focuses Start', async ({ page }) => {
@@ -438,6 +438,7 @@ test.describe('Confetti', () => {
     await expect(page.locator('#result .unlock', { hasText: 'Level up!' })).toBeVisible();
     await page.waitForTimeout(600);
     expect(await readConfetti(page)).toEqual([]);
+    expect(await readAudio(page)).toEqual([]); // no bang without a burst
   });
 
   // Level up with no new badge; returns the centre of the score, a non-interactive spot on the result screen.
@@ -503,5 +504,52 @@ test.describe('Confetti', () => {
     await expect(page.locator('#result .unlock', { hasText: 'Badge unlocked: First Rep' })).toBeVisible();
     const box = (await page.locator('#result .score').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); // tap-to-confetti must not throw either
+    await page.waitForTimeout(200);
+    expect(await readAudio(page)).toEqual([]); // no bang without a burst
+  });
+
+  test.describe('fireworks bang', () => {
+    const BANGS = ['sounds/fireworks-bang.mp3', 'sounds/fireworks-double-bang.mp3'];
+
+    test('every burst plays one bang, including tap bursts', async ({ page }) => {
+      const { x, y } = await celebrateAndTapTarget(page);
+      await expect.poll(() => readAudio(page).then(a => a.length)).toBe(3);
+      await page.mouse.click(x, y);
+      await bursts(page).toBe(4);
+      const audio = await readAudio(page);
+      expect(audio).toHaveLength(4);
+      for (const a of audio) {
+        expect(BANGS).toContain(a.src);
+        expect(a.played).toBe(1);
+        expect(a.volume).toBe(0.6);
+      }
+    });
+
+    test('picks one of the two files at random', async ({ page }) => {
+      await seedLog(page, [play('match', 500)]);
+      await startAndGo(page, 'match');
+      await page.evaluate(() => { Math.random = () => 0 });
+      await finishGame(page, 'match', 600);
+      await bursts(page).toBe(3);
+      expect((await readAudio(page)).map(a => a.src)).toEqual([BANGS[0], BANGS[0], BANGS[0]]);
+      await page.evaluate(() => { Math.random = () => 0.99 });
+      const box = (await page.locator('#result .score').boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await bursts(page).toBe(4);
+      expect((await readAudio(page)).map(a => a.src)).toEqual([BANGS[0], BANGS[0], BANGS[0], BANGS[1]]);
+    });
+
+    test('stays silent when sound is muted, while confetti still fires', async ({ page }) => {
+      await seedLog(page, [play('match', 500)]);
+      await page.click('#sound-btn');
+      expect((await readS(page)).sound).toBe(false);
+      await startAndGo(page, 'match');
+      await finishGame(page, 'match', 600);
+      await bursts(page).toBe(3);
+      const box = (await page.locator('#result .score').boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await bursts(page).toBe(4);
+      expect(await readAudio(page)).toEqual([]);
+    });
   });
 });

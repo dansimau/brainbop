@@ -22,7 +22,7 @@ Everything is in `index.html`, in this order. Section headers in the script are 
 - `<style>` – all CSS. Design tokens are CSS custom properties on `:root`. Game-specific classes are grouped after the shared UI classes.
 - `<body>` – static shell: header (level bar, streak, sound toggle, cloud sync chip), five `<section class="screen">` containers (`home`, `play`, `result`, `stats`, `badges`), and a fixed bottom `<nav>`.
 - `<script>` sections:
-  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`, `celebrate()` (confetti; no-op without the CDN script or under `prefers-reduced-motion`).
+  - **utilities** – DOM helpers (`$`, `$$`), random helpers, date helpers, `seeded()` PRNG, `toast()`, `flashFb()`, `celebrate()` (confetti; no-op without the CDN script or under `prefers-reduced-motion`). `celebrate()` also arms `tapConfetti`: a document click listener then fires a `burst()` at any tap outside a control (`button`, `a`, form fields, `nav`, `.modal-bg`) until `showScreen()` disarms it.
   - **sound** – `beep()` and the `sfx` object. Silently no-ops if audio is unavailable or muted.
   - **state** – `L` (the persisted log), `S` (the derived aggregate), `load()` (with the one-time v1 migration), `save()`, `gs(id)` (get or create a game's stats record in `S`), `streakFrom(days)`, `derive()`, `levelInfo(xp)`.
   - **sync** – Supabase config, `sb` client, `commit()` (save + header + push), `pushPending()`, `pull()`, `fullSync()`, sign in/out, the sync panel/chip renderers, and `openSyncModal()`.

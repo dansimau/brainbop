@@ -440,6 +440,59 @@ test.describe('Confetti', () => {
     expect(await readConfetti(page)).toEqual([]);
   });
 
+  // Level up with no new badge; returns the centre of the score, a non-interactive spot on the result screen.
+  const celebrateAndTapTarget = async (page: Parameters<typeof readConfetti>[0]) => {
+    await seedLog(page, [play('match', 500)]);
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 600);
+    await expect(page.locator('#result .unlock', { hasText: 'Level up!' })).toBeVisible();
+    await bursts(page).toBe(3);
+    const box = (await page.locator('#result .score').boundingBox())!;
+    return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+  };
+
+  test('after a celebration, a tap outside a control bursts at the tap point', async ({ page }) => {
+    const { x, y } = await celebrateAndTapTarget(page);
+    await page.mouse.click(x, y);
+    await bursts(page).toBe(4);
+    await page.mouse.click(x + 40, y + 60);
+    await bursts(page).toBe(5);
+    const c = await readConfetti(page);
+    expect(c[3]).toMatchObject({ count: 60, position: { x, y }, color: ['#6c8cff', '#ff7ab6', '#3ddc97', '#ffc857'] });
+    expect(c[4].position).toEqual({ x: x + 40, y: y + 60 });
+  });
+
+  test('taps on controls do not burst', async ({ page }) => {
+    const { x, y } = await celebrateAndTapTarget(page);
+    await page.click('#sound-btn'); // header button: stays on the result screen
+    await page.click('#sound-btn');
+    await page.waitForTimeout(200);
+    await bursts(page).toBe(3);
+    await page.mouse.click(x, y); // still armed afterwards
+    await bursts(page).toBe(4);
+  });
+
+  test('tap-to-confetti is disarmed when the screen changes', async ({ page }) => {
+    await celebrateAndTapTarget(page);
+    await page.click('#home-btn');
+    await expect(page.locator('#home')).toHaveClass(/active/);
+    const box = (await page.locator('#home .panel').first().boundingBox())!;
+    await page.mouse.click(box.x + 4, box.y + 4);
+    await page.waitForTimeout(200);
+    expect(await readConfetti(page)).toHaveLength(3);
+  });
+
+  test('tap-to-confetti stays off without a celebration', async ({ page }) => {
+    await seedLog(page, [play('match', 500)]);
+    await startAndGo(page, 'match');
+    await finishGame(page, 'match', 100);
+    await expect(page.locator('#result .unlock')).toHaveCount(0);
+    const box = (await page.locator('#result .score').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(600);
+    expect(await readConfetti(page)).toEqual([]);
+  });
+
   test('degrades gracefully when the CDN script is unavailable', async ({ page }) => {
     await page.route(CONFETTI_CDN, r => r.abort());
     await page.goto('/');
@@ -448,5 +501,7 @@ test.describe('Confetti', () => {
     await finishGame(page, 'match', 800);
     await expect(page.locator('#result .unlock', { hasText: 'Level up!' })).toBeVisible();
     await expect(page.locator('#result .unlock', { hasText: 'Badge unlocked: First Rep' })).toBeVisible();
+    const box = (await page.locator('#result .score').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); // tap-to-confetti must not throw either
   });
 });

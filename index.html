@@ -10,8 +10,8 @@
 <style>
 *{box-sizing:border-box}
 :root{--bg:#0e1120;--panel:#171b2e;--panel2:#1f2440;--line:#2a3155;--text:#e9ecf8;--muted:#8f97bb;--accent:#6c8cff;--pink:#ff7ab6;--good:#3ddc97;--bad:#ff5c7a;--warn:#ffc857;--r:14px}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
-button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;touch-action:manipulation}
 input{font:inherit}
 .app{max-width:960px;margin:0 auto;padding:16px 16px 90px}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
@@ -60,7 +60,7 @@ h3{margin:0 0 6px;font-size:16px}
 .playbar .ttl{font-weight:700;font-size:18px;flex:1}
 .hud{display:flex;justify-content:space-between;font-weight:600;margin-bottom:12px;font-size:15px;min-height:22px}
 .hud .timer{font-variant-numeric:tabular-nums;color:var(--warn)}
-#arena{min-height:400px;position:relative}
+#arena{min-height:400px;position:relative;touch-action:manipulation}
 .overlay{position:absolute;inset:0;background:var(--panel);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;z-index:2}
 .overlay .ico{font-size:56px}
 .overlay p{max-width:440px;color:var(--muted);line-height:1.5;margin:0}

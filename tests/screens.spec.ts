@@ -209,3 +209,16 @@ test.describe('Badges screen', () => {
     await expect(unlocked).toHaveText(['First Rep', 'On a Roll', 'Sharpshooter']);
   });
 });
+
+test.describe('Touch handling', () => {
+  test('double-tap zoom is disabled on the page, buttons and the arena', async ({ page }) => {
+    await page.goto('/');
+    const ta = (sel: string) => page.locator(sel).first().evaluate(el => getComputedStyle(el).touchAction);
+    expect(await ta('body')).toBe('manipulation');
+    expect(await ta('nav button')).toBe('manipulation');
+    expect(await ta('.gcard')).toBe('manipulation');
+    await page.evaluate(() => startGame('react'));
+    expect(await ta('#arena')).toBe('manipulation');
+    expect(await ta('.overlay .btn')).toBe('manipulation');
+  });
+});
